@@ -1,0 +1,61 @@
+# MTEX — Codemagic CI/CD
+# iOS: TestFlight'a otomatik yükleme (App Store Connect entegrasyonu "MTEX_ASC" adıyla tanımlı olmalı)
+# Android: imzasız release APK (Play yayını için ileride keystore eklenecek)
+
+workflows:
+  ios-testflight:
+    name: iOS TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: MTEX_ASC
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: io.metalexchange.mtex
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Paketleri indir
+        script: flutter pub get
+      - name: İmza profillerini uygula
+        script: xcode-project use-profiles
+      - name: CocoaPods
+        script: find . -name "Podfile" -execdir pod install \;
+      - name: IPA derle
+        script: flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+      email:
+        recipients:
+          - m.koc6330@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  android-apk:
+    name: Android APK
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+    scripts:
+      - name: Paketleri indir
+        script: flutter pub get
+      - name: APK derle
+        script: flutter build apk --release
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+    publishing:
+      email:
+        recipients:
+          - m.koc6330@gmail.com
+        notify:
+          success: true
+          failure: true

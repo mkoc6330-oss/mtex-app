@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "306103852683",
+    "project_id": "mtex-metalexchange",
+    "storage_bucket": "mtex-metalexchange.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:306103852683:android:698d8d3997d6472c393e8e",
+        "android_client_info": {
+          "package_name": "io.metalexchange.mtex"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDsrezSXKuYgpRkjTGQu9rVUdYksyuNWvA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
