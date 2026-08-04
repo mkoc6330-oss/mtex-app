@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../api.dart';
 import '../theme.dart';
 import 'home.dart' show tlBicim;
@@ -15,6 +16,7 @@ class _MarketScreenState extends State<MarketScreen> {
   Map<String, dynamic>? _v;
   bool _yukleniyor = true;
   Timer? _zamanlayici;
+  DateTime? _sonVeri;
 
   @override
   void initState() {
@@ -35,9 +37,26 @@ class _MarketScreenState extends State<MarketScreen> {
     if (!sessiz) setState(() => _yukleniyor = true);
     try {
       final j = await Api.fiyatlar();
-      if (j['ok'] == true) _v = j;
+      if (j['ok'] == true) {
+        _v = j;
+        _sonVeri = DateTime.now();
+      }
     } catch (_) {}
     if (mounted) setState(() => _yukleniyor = false);
+  }
+
+  /// Kurun günlük değişim yüzdesi (API `doviz.degisim` sağlıyorsa)
+  num? _degisim(Map<String, dynamic>? doviz, String anahtar) {
+    final d = doviz?['degisim'];
+    return d is Map ? d[anahtar] as num? : null;
+  }
+
+  /// Gram altın TL — ons USD ve kurdan anlık hesap
+  String _gramAltin(Map<String, dynamic>? doviz, Map<String, dynamic>? emtia) {
+    final ons = emtia?['altin_ons'] as num?;
+    final usd = doviz?['usdtry'] as num?;
+    if (ons == null || usd == null) return '—';
+    return tlBicim.format(ons / 31.1034768 * usd);
   }
 
   String _f(dynamic x, {int ondalik = 0}) {
@@ -71,6 +90,12 @@ class _MarketScreenState extends State<MarketScreen> {
           const SizedBox(width: 5),
           const Text('CANLI', style: TextStyle(fontSize: 10.5,
               fontWeight: FontWeight.w800, letterSpacing: .8, color: MT.yesil)),
+          if (_sonVeri != null) ...[
+            const SizedBox(width: 7),
+            Text(DateFormat('HH:mm:ss').format(_sonVeri!),
+                style: MT.fiyat(size: 11,
+                    weight: FontWeight.w600, color: MT.soluk)),
+          ],
         ]),
         actions: [
           IconButton(onPressed: _yukle,
@@ -93,10 +118,15 @@ class _MarketScreenState extends State<MarketScreen> {
                   _kalem('Yurt İçi (Ortalama)', _f(hurda?['yerli_tl']), 'TL/ton'),
                 ]),
                 _bolum('Döviz', [
-                  _kalem('USD/TRY', _f(doviz?['usdtry'], ondalik: 2), ''),
-                  _kalem('EUR/TRY', _f(doviz?['eurtry'], ondalik: 2), ''),
-                  _kalem('GBP/TRY', _f(doviz?['gbptry'], ondalik: 2), ''),
-                  _kalem('EUR/USD', _f(doviz?['eurusd'], ondalik: 4), ''),
+                  _kurKalem('USD/TRY', _f(doviz?['usdtry'], ondalik: 2),
+                      _degisim(doviz, 'usdtry')),
+                  _kurKalem('EUR/TRY', _f(doviz?['eurtry'], ondalik: 2),
+                      _degisim(doviz, 'eurtry')),
+                  _kurKalem('GBP/TRY', _f(doviz?['gbptry'], ondalik: 2),
+                      _degisim(doviz, 'gbptry')),
+                  _kurKalem('EUR/USD', _f(doviz?['eurusd'], ondalik: 4),
+                      _degisim(doviz, 'eurusd')),
+                  _kalem('Gram Altın', _gramAltin(doviz, emtia), 'TL/gram'),
                 ]),
                 // Gruplu emtia listesi (API `emtia.gruplar` sağlıyorsa siteyle
                 // birebir aynı bölümler gösterilir; yoksa eski düz liste)
@@ -165,6 +195,17 @@ class _MarketScreenState extends State<MarketScreen> {
         const SizedBox(height: 5),
         Text((p['formul'] ?? '').toString(),
             style: const TextStyle(fontSize: 12, color: MT.soluk)),
+        if (p['dolar_maliyet'] is num) ...[
+          const SizedBox(height: 7),
+          Row(children: [
+            const Icon(Icons.swap_vert_rounded, size: 14, color: MT.altin),
+            const SizedBox(width: 5),
+            Expanded(child: Text(
+              'Dolar 0,10 ₺ oynarsa parite ≈ ${_f((p['dolar_maliyet'] as num) * 0.1, ondalik: 1)} TL/ton değişir',
+              style: const TextStyle(fontSize: 12, color: MT.soluk),
+            )),
+          ]),
+        ],
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
@@ -191,6 +232,33 @@ class _MarketScreenState extends State<MarketScreen> {
             ...cocuklar,
           ]),
         )),
+      );
+
+  /// Kur satırı: günlük değişim yüzdesi varsa yeşil/kırmızı rozetle gösterir
+  Widget _kurKalem(String ad, String deger, num? degisim) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        child: Row(children: [
+          Expanded(child: Text(ad,
+              style: const TextStyle(fontSize: 14, color: MT.soluk))),
+          if (degisim != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+              decoration: BoxDecoration(
+                color: (degisim >= 0 ? MT.yesil : MT.kirmizi)
+                    .withValues(alpha: .13),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '${degisim >= 0 ? '▲' : '▼'} %${degisim.abs().toStringAsFixed(2).replaceAll('.', ',')}',
+                style: MT.fiyat(size: 10.5, weight: FontWeight.w700,
+                    color: degisim >= 0 ? MT.yesil : MT.kirmizi),
+              ),
+            ),
+            const SizedBox(width: 9),
+          ],
+          Text(deger,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+        ]),
       );
 
   Widget _kalem(String ad, String deger, String birim) => Padding(
