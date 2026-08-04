@@ -83,18 +83,40 @@ Future<void> _bildirimKur() async {
     );
   });
 
+  // iOS: APNs belirteci hazır olmadan abonelik/token işlemleri sessizce
+  // başarısız olur — belirteç gelene kadar bekle (en fazla ~20 sn)
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+    for (var i = 0; i < 20; i++) {
+      try {
+        if (await fm.getAPNSToken() != null) break;
+      } catch (_) {}
+      await Future.delayed(const Duration(seconds: 1));
+    }
+  }
+
   // Herkese yayın bildirimleri için konu aboneliği (giriş gerektirmez):
-  // sunucu "fiyat" konusuna tek gönderimle tüm cihazlara ulaşır
+  // sunucu "fiyat" konusuna tek gönderimle tüm cihazlara ulaşır.
+  // İlk deneme tutmazsa 10 sn sonra bir kez daha dene.
   try {
     await fm.subscribeToTopic('fiyat');
-  } catch (_) {}
+  } catch (_) {
+    await Future.delayed(const Duration(seconds: 10));
+    try {
+      await fm.subscribeToTopic('fiyat');
+    } catch (_) {}
+  }
 
   // Cihaz adresini sunucuya bildir
-  // (iOS'ta APNs belirteci henüz hazır değilse getToken hata verebilir)
   try {
     final t = await fm.getToken();
     if (t != null) await Api.cihazKaydet(t, 'mobil');
-  } catch (_) {}
+  } catch (_) {
+    await Future.delayed(const Duration(seconds: 10));
+    try {
+      final t = await fm.getToken();
+      if (t != null) await Api.cihazKaydet(t, 'mobil');
+    } catch (_) {}
+  }
   fm.onTokenRefresh.listen((t2) => Api.cihazKaydet(t2, 'mobil'));
 }
 

@@ -1,3 +1,5 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../api.dart';
 import '../theme.dart';
@@ -70,8 +72,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(title: const Text('Profil')),
       body: _yukleniyor
           ? const Center(child: CircularProgressIndicator(color: MT.turuncu))
-          : _uye != null ? _uyeGorunumu() : _girisFormu(),
+          : Column(children: [
+              _bildirimDurumu(),
+              Expanded(child: _uye != null ? _uyeGorunumu() : _girisFormu()),
+            ]),
     );
+  }
+
+  /// Bildirim altyapısının cihazda gerçekten kurulu olup olmadığını gösterir
+  /// (teşhis amaçlı: yeşil = FCM belirteci alınabildi, bildirim gelebilir)
+  Widget _bildirimDurumu() {
+    final mobil = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+    if (!mobil) return const SizedBox.shrink();
+    return FutureBuilder<String?>(
+      future: _pushBelirteci(),
+      builder: (_, s) {
+        final bekliyor = s.connectionState != ConnectionState.done;
+        final tamam = s.data != null;
+        final renk = bekliyor ? MT.soluk : (tamam ? MT.yesil : MT.kirmizi);
+        final metin = bekliyor
+            ? 'Bildirim durumu denetleniyor…'
+            : tamam
+                ? 'Bildirimler aktif — fiyat güncellemeleri bu cihaza gelir'
+                : 'Bildirim bağlantısı kurulamadı — interneti kontrol edip uygulamayı yeniden açın';
+        return Container(
+          margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: renk.withValues(alpha: .10),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: renk.withValues(alpha: .35)),
+          ),
+          child: Row(children: [
+            Container(width: 8, height: 8,
+                decoration: BoxDecoration(color: renk, shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Expanded(child: Text(metin,
+                style: TextStyle(fontSize: 12, color: renk,
+                    fontWeight: FontWeight.w600))),
+          ]),
+        );
+      },
+    );
+  }
+
+  Future<String?> _pushBelirteci() async {
+    try {
+      return await FirebaseMessaging.instance.getToken();
+    } catch (_) {
+      return null;
+    }
   }
 
   Widget _uyeGorunumu() {
