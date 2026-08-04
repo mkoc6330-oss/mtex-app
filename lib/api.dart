@@ -115,8 +115,20 @@ class Api {
       }
     }
 
+    // Sıralama: backend `oncelik` verdiyse (1 = en üst) önce o,
+    // öncelik verilmeyenler fiyata göre azalan sırada devam eder.
     final sirali = birlesik.values.toList()
-      ..sort((a, b) => (b['fiyat'] as num).compareTo(a['fiyat'] as num));
+      ..sort((a, b) {
+        final oa = a['oncelik'] as num?;
+        final ob = b['oncelik'] as num?;
+        if (oa != null || ob != null) {
+          if (oa == null) return 1;
+          if (ob == null) return -1;
+          final c = oa.compareTo(ob);
+          if (c != 0) return c;
+        }
+        return (b['fiyat'] as num).compareTo(a['fiyat'] as num);
+      });
     if (sirali.isNotEmpty) {
       _tumFabCache = sirali;
       _tumFabZamani = DateTime.now();
