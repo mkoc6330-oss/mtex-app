@@ -75,6 +75,55 @@ class Api {
   static Future<Map<String, dynamic>> guncellemeler({int limit = 25}) =>
       _al('updates?limit=$limit');
 
+  static List<Map<String, dynamic>>? _tumFabCache;
+  static DateTime? _tumFabZamani;
+
+  /// Tüm fabrikalar (kalite ayrımı olmadan). Her fabrika için EN YÜKSEK alım
+  /// fiyatı ve o fiyatın kalite adı döner; fiyata göre azalan sıralıdır.
+  /// API'de tüm-fabrika ucu olmadığından kaliteler paralel çekilip
+  /// birleştirilir; sonuç 5 dakika önbellekte tutulur.
+  static Future<List<Map<String, dynamic>>> tumFabrikalar(
+      {bool yenile = false}) async {
+    if (!yenile &&
+        _tumFabCache != null &&
+        DateTime.now().difference(_tumFabZamani!).inMinutes < 5) {
+      return _tumFabCache!;
+    }
+    final kj = await kaliteler();
+    if (kj['ok'] != true) return _tumFabCache ?? [];
+    final kaliteListesi = (kj['kaliteler'] as List).cast<Map<String, dynamic>>();
+
+    final yanitlar = await Future.wait(kaliteListesi.map((k) async {
+      try {
+        final y = await fabrikalar(kaliteId: k['id'] as int);
+        return y['ok'] == true ? {'kalite': k['ad'], 'yanit': y} : null;
+      } catch (_) {
+        return null;
+      }
+    }));
+
+    final birlesik = <int, Map<String, dynamic>>{};
+    for (final s in yanitlar.whereType<Map<String, dynamic>>()) {
+      final y = s['yanit'] as Map<String, dynamic>;
+      for (final f in (y['fabrikalar'] as List).cast<Map<String, dynamic>>()) {
+        final id = f['id'] as int;
+        final fiyat = (f['fiyat'] ?? 0) as num;
+        final mevcut = birlesik[id];
+        if (mevcut == null || fiyat > (mevcut['fiyat'] as num)) {
+          birlesik[id] = {...f, 'kalite': s['kalite']};
+        }
+      }
+    }
+
+    final sirali = birlesik.values.toList()
+      ..sort((a, b) => (b['fiyat'] as num).compareTo(a['fiyat'] as num));
+    if (sirali.isNotEmpty) {
+      _tumFabCache = sirali;
+      _tumFabZamani = DateTime.now();
+    }
+    return sirali;
+  }
+
   /// Bir fabrikanın satın aldığı tüm kalitelerin güncel fiyatları.
   /// `factories/{id}` ucundan tek istekle gelir; fiyata göre azalan sıralıdır:
   /// [{'kalite_id': 1, 'kalite': 'DKP', 'fiyat': 17450, 'tarih': '2026-07-30'}, ...]

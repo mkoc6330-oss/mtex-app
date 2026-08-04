@@ -83,8 +83,8 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(f.ad)),
       body: ListView(padding: const EdgeInsets.fromLTRB(14, 8, 14, 30), children: [
-        Row(children: [
-          if (f.bolge != null && f.bolge!.isNotEmpty)
+        if (f.bolge != null && f.bolge!.isNotEmpty) ...[
+          Row(children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
@@ -95,19 +95,9 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
               child: Text(f.bolge!,
                   style: const TextStyle(fontSize: 12, color: MT.soluk)),
             ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: MT.kart,
-              borderRadius: BorderRadius.circular(7),
-              border: Border.all(color: MT.cizgi),
-            ),
-            child: Text('Sıra ${f.sira}.',
-                style: const TextStyle(fontSize: 12, color: MT.soluk)),
-          ),
-        ]),
-        const SizedBox(height: 14),
+          ]),
+          const SizedBox(height: 14),
+        ],
         Card(child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../api.dart';
 import '../theme.dart';
@@ -12,12 +14,25 @@ class MarketScreen extends StatefulWidget {
 class _MarketScreenState extends State<MarketScreen> {
   Map<String, dynamic>? _v;
   bool _yukleniyor = true;
+  Timer? _zamanlayici;
 
   @override
-  void initState() { super.initState(); _yukle(); }
+  void initState() {
+    super.initState();
+    _yukle();
+    // Canlı veri: 30 saniyede bir sessizce yenile
+    _zamanlayici = Timer.periodic(
+        const Duration(seconds: 30), (_) => _yukle(sessiz: true));
+  }
 
-  Future<void> _yukle() async {
-    setState(() => _yukleniyor = true);
+  @override
+  void dispose() {
+    _zamanlayici?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _yukle({bool sessiz = false}) async {
+    if (!sessiz) setState(() => _yukleniyor = true);
     try {
       final j = await Api.fiyatlar();
       if (j['ok'] == true) _v = j;
@@ -40,9 +55,21 @@ class _MarketScreenState extends State<MarketScreen> {
     final parite = _v?['parite'] as Map<String, dynamic>?;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Piyasa'), actions: [
-        IconButton(onPressed: _yukle, icon: const Icon(Icons.refresh, color: MT.soluk)),
-      ]),
+      appBar: AppBar(
+        title: Row(children: [
+          const Text('Piyasa'),
+          const SizedBox(width: 10),
+          Container(width: 8, height: 8, decoration: const BoxDecoration(
+              color: MT.yesil, shape: BoxShape.circle)),
+          const SizedBox(width: 5),
+          const Text('CANLI', style: TextStyle(fontSize: 10.5,
+              fontWeight: FontWeight.w800, letterSpacing: .8, color: MT.yesil)),
+        ]),
+        actions: [
+          IconButton(onPressed: _yukle,
+              icon: const Icon(Icons.refresh, color: MT.soluk)),
+        ],
+      ),
       body: RefreshIndicator(
         color: MT.turuncu, backgroundColor: MT.kart, onRefresh: _yukle,
         child: _yukleniyor && _v == null
@@ -52,7 +79,7 @@ class _MarketScreenState extends State<MarketScreen> {
                 const SizedBox(height: 14),
                 _bolum('Çelik Ürünleri', [
                   _kalem('İnşaat Demiri', _f(celik?['insaat_demiri_tl']), 'TL/ton'),
-                  _kalem('Kütük', _f(celik?['kutuk_tl']), 'TL/ton'),
+                  _kalem('Kütük', _f(celik?['kutuk_tl']), 'USD/ton'),
                 ]),
                 _bolum('Hurda', [
                   _kalem('İthal (HMS 1&2)', _f(hurda?['ithal_usd']), 'USD/ton'),
@@ -69,10 +96,10 @@ class _MarketScreenState extends State<MarketScreen> {
                   _kalem('Brent Petrol', _f(emtia?['brent'], ondalik: 2), 'USD/varil'),
                   _kalem('WTI', _f(emtia?['wti'], ondalik: 2), 'USD/varil'),
                   _kalem('Bakır', _f(emtia?['bakir_ton']), 'USD/ton'),
-                  _kalem('Çinko', _f(emtia?['cinko'], ondalik: 2), ''),
-                  _kalem('Kurşun', _f(emtia?['kursun'], ondalik: 2), ''),
-                  _kalem('Nikel', _f(emtia?['nikel'], ondalik: 2), ''),
-                  _kalem('Kalay', _f(emtia?['kalay'], ondalik: 2), ''),
+                  _kalem('Çinko', _f(emtia?['cinko']), 'USD/ton'),
+                  _kalem('Kurşun', _f(emtia?['kursun']), 'USD/ton'),
+                  _kalem('Nikel', _f(emtia?['nikel']), 'USD/ton'),
+                  _kalem('Kalay', _f(emtia?['kalay']), 'USD/ton'),
                   _kalem('Altın', _f(emtia?['altin_ons'], ondalik: 2), 'USD/ons'),
                   _kalem('Gümüş', _f(emtia?['gumus'], ondalik: 2), 'USD/ons'),
                 ]),
