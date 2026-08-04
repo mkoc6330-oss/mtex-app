@@ -25,6 +25,16 @@ workflows:
         script: find . -name "Podfile" -execdir pod install \;
       - name: IPA derle
         script: flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
+      - name: Paket dogrulama (teshis)
+        script: |
+          APP=$(find build/ios/archive -name "Runner.app" | head -1)
+          echo "== UYGULAMA: $APP =="
+          echo "== YETKILER (entitlements) =="
+          codesign -d --entitlements :- "$APP" || true
+          echo "== FIREBASE PLIST =="
+          ls -la "$APP/GoogleService-Info.plist" 2>/dev/null || echo "!!! GoogleService-Info.plist PAKETTE YOK !!!"
+          echo "== PROVISION aps-environment =="
+          strings "$APP/embedded.mobileprovision" | grep -A1 aps-environment || echo "!!! provision iceriginde aps-environment bulunamadi !!!"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
