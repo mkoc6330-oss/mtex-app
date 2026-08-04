@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -29,13 +31,21 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Api.baslat();
 
-  if (_mobilPlatform) {
+  // Arayüz her koşulda açılır; Firebase/bildirim kurulumu arkada yapılır.
+  // (Firebase beklenirse ve takılırsa uygulama açılış ekranında kalıyordu.)
+  runApp(const MtexApp());
+
+  if (_mobilPlatform) unawaited(_firebaseBaslat());
+}
+
+Future<void> _firebaseBaslat() async {
+  try {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_arkaPlanMesaji);
     await _bildirimKur();
+  } catch (_) {
+    // Bildirim kurulamazsa uygulama bildirimlersiz çalışmaya devam eder
   }
-
-  runApp(const MtexApp());
 }
 
 Future<void> _bildirimKur() async {
@@ -71,8 +81,11 @@ Future<void> _bildirimKur() async {
   });
 
   // Cihaz adresini sunucuya bildir
-  final t = await fm.getToken();
-  if (t != null) await Api.cihazKaydet(t, 'mobil');
+  // (iOS'ta APNs belirteci henüz hazır değilse getToken hata verebilir)
+  try {
+    final t = await fm.getToken();
+    if (t != null) await Api.cihazKaydet(t, 'mobil');
+  } catch (_) {}
   fm.onTokenRefresh.listen((t2) => Api.cihazKaydet(t2, 'mobil'));
 }
 
