@@ -111,7 +111,20 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     final toplamTon = toplamKg / 1000;
     final ortalama = toplamTon > 0 ? toplamTutar / toplamTon : 0.0;
 
+    final klavyeAcik = MediaQuery.of(c).viewInsets.bottom > 0;
     return Scaffold(
+      // Klavye açıkken hemen üstünde "kapat" düğmesi görünür
+      floatingActionButton: klavyeAcik
+          ? FloatingActionButton.extended(
+              onPressed: () =>
+                  FocusManager.instance.primaryFocus?.unfocus(),
+              backgroundColor: MT.altin,
+              foregroundColor: MT.altinUstu,
+              icon: const Icon(Icons.keyboard_hide_rounded),
+              label: const Text('Klavyeyi Kapat',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+            )
+          : null,
       appBar: AppBar(title: const Text('Eksper Hesabı')),
       body: _fabYukleniyor
           ? const Center(child: CircularProgressIndicator(color: MT.altin))
