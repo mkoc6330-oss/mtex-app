@@ -46,6 +46,13 @@ class _MarketScreenState extends State<MarketScreen> {
     return ondalik == 0 ? tlBicim.format(n) : n.toStringAsFixed(ondalik).replaceAll('.', ',');
   }
 
+  /// Emtia değerleri: 1000 üzeri binlik ayraçlı, altı 2 ondalıklı
+  String _emtiaF(dynamic x) {
+    if (x == null || x is! num) return '—';
+    final n = x.toDouble();
+    return n.abs() >= 1000 ? tlBicim.format(n) : _f(n, ondalik: 2);
+  }
+
   @override
   Widget build(BuildContext c) {
     final hurda  = _v?['hurda'] as Map<String, dynamic>?;
@@ -92,24 +99,36 @@ class _MarketScreenState extends State<MarketScreen> {
                   _kalem('GBP/TRY', _f(doviz?['gbptry'], ondalik: 2), ''),
                   _kalem('EUR/USD', _f(doviz?['eurusd'], ondalik: 4), ''),
                 ]),
-                _bolum('Emtia', [
-                  _kalem('Brent Petrol', _f(emtia?['brent'], ondalik: 2), 'USD/varil'),
-                  _kalem('WTI', _f(emtia?['wti'], ondalik: 2), 'USD/varil'),
-                  _kalem('Bakır', _f(emtia?['bakir_ton']), 'USD/ton'),
-                  _kalem('Çinko', _f(emtia?['cinko']), 'USD/ton'),
-                  _kalem('Kurşun', _f(emtia?['kursun']), 'USD/ton'),
-                  _kalem('Nikel', _f(emtia?['nikel']), 'USD/ton'),
-                  _kalem('Kalay', _f(emtia?['kalay']), 'USD/ton'),
-                  _kalem('Altın', _f(emtia?['altin_ons'], ondalik: 2), 'USD/ons'),
-                  _kalem('Gümüş', _f(emtia?['gumus'], ondalik: 2), 'USD/ons'),
-                ]),
-                if ((emtia?['liste'] as List?)?.isNotEmpty ?? false)
-                  _bolum('Diğer Kalemler', [
-                    for (final e in (emtia!['liste'] as List))
-                      _kalem((e['ad'] ?? '').toString(),
-                             (e['deger'] ?? '—').toString(),
-                             (e['birim'] ?? '').toString()),
+                // Gruplu emtia listesi (API `emtia.gruplar` sağlıyorsa siteyle
+                // birebir aynı bölümler gösterilir; yoksa eski düz liste)
+                if (((emtia?['gruplar'] as List?) ?? const []).isNotEmpty)
+                  for (final g in (emtia!['gruplar'] as List).cast<Map<String, dynamic>>())
+                    _bolum((g['baslik'] ?? '').toString(), [
+                      for (final k in ((g['kalemler'] as List?) ?? const [])
+                          .cast<Map<String, dynamic>>())
+                        _kalem((k['ad'] ?? '').toString(), _emtiaF(k['deger']),
+                            (k['birim'] ?? '').toString()),
+                    ])
+                else ...[
+                  _bolum('Emtia', [
+                    _kalem('Brent Petrol', _f(emtia?['brent'], ondalik: 2), 'USD/varil'),
+                    _kalem('WTI', _f(emtia?['wti'], ondalik: 2), 'USD/varil'),
+                    _kalem('Bakır', _f(emtia?['bakir_ton']), 'USD/ton'),
+                    _kalem('Çinko', _f(emtia?['cinko']), 'USD/ton'),
+                    _kalem('Kurşun', _f(emtia?['kursun']), 'USD/ton'),
+                    _kalem('Nikel', _f(emtia?['nikel']), 'USD/ton'),
+                    _kalem('Kalay', _f(emtia?['kalay']), 'USD/ton'),
+                    _kalem('Altın', _f(emtia?['altin_ons'], ondalik: 2), 'USD/ons'),
+                    _kalem('Gümüş', _f(emtia?['gumus'], ondalik: 2), 'USD/ons'),
                   ]),
+                  if ((emtia?['liste'] as List?)?.isNotEmpty ?? false)
+                    _bolum('Diğer Kalemler', [
+                      for (final e in (emtia!['liste'] as List))
+                        _kalem((e['ad'] ?? '').toString(),
+                               (e['deger'] ?? '—').toString(),
+                               (e['birim'] ?? '').toString()),
+                    ]),
+                ],
               ]),
       ),
     );
