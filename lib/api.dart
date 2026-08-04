@@ -193,8 +193,8 @@ class Api {
   static Future<Map<String, dynamic>> ben() => _al('me');
 
   // ---------- Push cihaz kaydı ----------
+  // Giriş şartı yok: bildirimler üye olmayan kullanıcılara da gider.
   static Future<void> cihazKaydet(String pushToken, String platform) async {
-    if (!girisliMi) return;
     try {
       await _gonder('devices', {
         'push_token': pushToken,

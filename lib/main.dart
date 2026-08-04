@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'api.dart';
+import 'firebase_options.dart';
 import 'theme.dart';
 import 'screens/home.dart';
 import 'screens/market.dart';
@@ -18,7 +19,8 @@ final yerelBildirim = FlutterLocalNotificationsPlugin();
 /// Uygulama kapalıyken gelen bildirim
 @pragma('vm:entry-point')
 Future<void> _arkaPlanMesaji(RemoteMessage m) async {
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform);
 }
 
 /// Firebase yalnızca Android/iOS'ta kullanılır (masaüstü/web önizlemede atlanır)
@@ -40,7 +42,8 @@ Future<void> main() async {
 
 Future<void> _firebaseBaslat() async {
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform);
     FirebaseMessaging.onBackgroundMessage(_arkaPlanMesaji);
     await _bildirimKur();
   } catch (_) {
@@ -79,6 +82,12 @@ Future<void> _bildirimKur() async {
       ),
     );
   });
+
+  // Herkese yayın bildirimleri için konu aboneliği (giriş gerektirmez):
+  // sunucu "fiyat" konusuna tek gönderimle tüm cihazlara ulaşır
+  try {
+    await fm.subscribeToTopic('fiyat');
+  } catch (_) {}
 
   // Cihaz adresini sunucuya bildir
   // (iOS'ta APNs belirteci henüz hazır değilse getToken hata verebilir)
