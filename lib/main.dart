@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'api.dart';
 import 'firebase_options.dart';
+import 'models.dart';
+import 'screens/factory_detail.dart';
 import 'theme.dart';
 import 'screens/home.dart';
 import 'screens/market.dart';
@@ -15,6 +18,29 @@ import 'screens/articles.dart';
 import 'screens/profile.dart';
 
 final yerelBildirim = FlutterLocalNotificationsPlugin();
+final navigatorKey = GlobalKey<NavigatorState>();
+
+/// Bildirime tıklanınca ilgili fabrikanın detay sayfasını açar.
+/// Beklenen data: {tur: fiyat_guncelleme, fabrika_id, fabrika_ad, kalite_id}
+void _bildirimYonlendir(Map<String, dynamic> data) {
+  if (data['tur'] != 'fiyat_guncelleme') return;
+  final fabrikaId = int.tryParse((data['fabrika_id'] ?? '').toString());
+  if (fabrikaId == null) return;
+  final kaliteId = int.tryParse((data['kalite_id'] ?? '').toString());
+
+  // Detay ekranı kendi verisini API'den çeker; eksik alanlar önemsiz
+  final fabrika = Fabrika.json({
+    'id': fabrikaId,
+    'ad': (data['fabrika_ad'] ?? '').toString(),
+    'slug': (data['fabrika_slug'] ?? '').toString(),
+    'fiyat': 0,
+    'sira': 0,
+  });
+
+  navigatorKey.currentState?.push(MaterialPageRoute(
+    builder: (_) => FactoryDetailScreen(fabrika: fabrika, kaliteId: kaliteId),
+  ));
+}
 
 /// Uygulama kapalıyken gelen bildirim
 @pragma('vm:entry-point')
@@ -53,7 +79,9 @@ Future<void> _firebaseBaslat() async {
 
 Future<void> _bildirimKur() async {
   final fm = FirebaseMessaging.instance;
-  await fm.requestPermission(alert: true, badge: true, sound: true);
+  final izin =
+      await fm.requestPermission(alert: true, badge: true, sound: true);
+  debugPrint('MTEX bildirim izni: ${izin.authorizationStatus}');
 
   // iOS: uygulama ön plandayken de sistem bildirimi göster
   await fm.setForegroundNotificationPresentationOptions(
@@ -73,6 +101,15 @@ Future<void> _bildirimKur() async {
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       iOS: DarwinInitializationSettings(),
     ),
+    // Uygulama açıkken gösterilen yerel bildirime tıklama
+    onDidReceiveNotificationResponse: (yanit) {
+      final p = yanit.payload;
+      if (p == null || p.isEmpty) return;
+      try {
+        _bildirimYonlendir(
+            (jsonDecode(p) as Map).cast<String, dynamic>());
+      } catch (_) {}
+    },
   );
 
   // Uygulama açıkken gelen bildirimi göster (Android; iOS'u sistem gösterir)
@@ -84,6 +121,7 @@ Future<void> _bildirimKur() async {
         id: n.hashCode,
         title: n.title,
         body: n.body,
+        payload: jsonEncode(m.data),
         notificationDetails: const NotificationDetails(
           android: AndroidNotificationDetails('fiyat', 'Fiyat Güncellemeleri',
               importance: Importance.high, priority: Priority.high),
@@ -92,6 +130,17 @@ Future<void> _bildirimKur() async {
       );
     }
   });
+
+  // Bildirime tıklama — uygulama arka plandayken
+  FirebaseMessaging.onMessageOpenedApp.listen((m) => _bildirimYonlendir(m.data));
+
+  // Bildirime tıklama — uygulama tamamen kapalıyken açıldıysa
+  // (navigator hazır olsun diye kısa gecikmeyle)
+  final ilkMesaj = await fm.getInitialMessage();
+  if (ilkMesaj != null) {
+    await Future.delayed(const Duration(milliseconds: 600));
+    _bildirimYonlendir(ilkMesaj.data);
+  }
 
   // iOS: APNs belirteci hazır olmadan abonelik/token işlemleri sessizce
   // başarısız olur — belirteç gelene kadar bekle (en fazla ~20 sn)
@@ -109,11 +158,16 @@ Future<void> _bildirimKur() async {
   // İlk deneme tutmazsa 10 sn sonra bir kez daha dene.
   try {
     await fm.subscribeToTopic('fiyat');
-  } catch (_) {
+    debugPrint('MTEX topic aboneligi: BASARILI (fiyat)');
+  } catch (e) {
+    debugPrint('MTEX topic aboneligi ilk deneme hatasi: $e');
     await Future.delayed(const Duration(seconds: 10));
     try {
       await fm.subscribeToTopic('fiyat');
-    } catch (_) {}
+      debugPrint('MTEX topic aboneligi: BASARILI (2. deneme)');
+    } catch (e2) {
+      debugPrint('MTEX topic aboneligi: BASARISIZ ($e2)');
+    }
   }
 
   // Cihaz adresini sunucuya bildir
@@ -134,6 +188,7 @@ class MtexApp extends StatelessWidget {
   const MtexApp({super.key});
   @override
   Widget build(BuildContext c) => MaterialApp(
+        navigatorKey: navigatorKey,
         title: 'MTEX',
         debugShowCheckedModeBanner: false,
         theme: MT.tema(),
