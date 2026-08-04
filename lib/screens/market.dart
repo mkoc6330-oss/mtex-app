@@ -90,8 +90,7 @@ class _MarketScreenState extends State<MarketScreen> {
                 ]),
                 _bolum('Hurda', [
                   _kalem('İthal (HMS 1&2)', _f(hurda?['ithal_usd']), 'USD/ton'),
-                  _kalem('Yurt İçi', _f(hurda?['yerli_tl']), 'TL/ton'),
-                  _kalem('DKP / Sac', _f(hurda?['dkp_tl']), 'TL/ton'),
+                  _kalem('Yurt İçi (Ortalama)', _f(hurda?['yerli_tl']), 'TL/ton'),
                 ]),
                 _bolum('Döviz', [
                   _kalem('USD/TRY', _f(doviz?['usdtry'], ondalik: 2), ''),

@@ -24,6 +24,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   List<Map<String, dynamic>> _kaliteler = [];
   final Map<int, TextEditingController> _kg = {};
+  final _iskonto = TextEditingController();
   bool _fabYukleniyor = true;
   bool _kaliteYukleniyor = false;
 
@@ -38,6 +39,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     for (final c in _kg.values) {
       c.dispose();
     }
+    _iskonto.dispose();
     super.dispose();
   }
 
@@ -54,6 +56,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   }
 
   Future<void> _fabrikaSec(Fabrika f) async {
+    // Yeni fabrika seçilince önceki hesabın kg ve iskontosu sıfırlanır
+    for (final c in _kg.values) {
+      c.clear();
+    }
+    _iskonto.clear();
     setState(() {
       _secili = f;
       _kaliteYukleniyor = true;
@@ -78,13 +85,28 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         0;
   }
 
+  /// İskonto: TL/ton, - veya + yazılabilir; boşsa 0 (normal fiyatla hesap)
+  double get _iskontoDegeri {
+    final t = _iskonto.text.trim();
+    if (t.isEmpty) return 0;
+    return double.tryParse(t
+            .replaceAll('.', '')
+            .replaceAll(' ', '')
+            .replaceAll(',', '.')) ??
+        0;
+  }
+
+  /// Kalitenin iskonto uygulanmış birim fiyatı (TL/ton)
+  double _birimFiyat(Map<String, dynamic> k) =>
+      (k['fiyat'] as num).toDouble() + _iskontoDegeri;
+
   @override
   Widget build(BuildContext c) {
     double toplamKg = 0, toplamTutar = 0;
     for (final k in _kaliteler) {
       final kg = _kgDegeri(k['kalite_id'] as int);
       toplamKg += kg;
-      toplamTutar += kg / 1000 * (k['fiyat'] as num);
+      toplamTutar += kg / 1000 * _birimFiyat(k);
     }
     final toplamTon = toplamKg / 1000;
     final ortalama = toplamTon > 0 ? toplamTutar / toplamTon : 0.0;
@@ -113,6 +135,26 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                         final f = _fabrikalar.where((x) => x.id == id).firstOrNull;
                         if (f != null) _fabrikaSec(f);
                       },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _iskonto,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true, signed: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,+-]')),
+                      ],
+                      style: MT.fiyat(size: 14),
+                      decoration: const InputDecoration(
+                        labelText: 'İskonto (± TL/ton) — isteğe bağlı',
+                        hintText: 'örn. -500 veya 300',
+                        suffixText: 'TL/ton',
+                        suffixStyle: TextStyle(fontSize: 12, color: MT.soluk),
+                        helperText:
+                            'Boş bırakılırsa normal kalite fiyatlarıyla hesaplanır',
+                        helperStyle: TextStyle(fontSize: 11, color: MT.soluk),
+                      ),
+                      onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 14),
                     const Padding(
@@ -145,8 +187,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   Widget _kaliteSatiri(Map<String, dynamic> k) {
     final id = k['kalite_id'] as int;
     final kg = _kgDegeri(id);
-    final tutar = kg / 1000 * (k['fiyat'] as num);
+    final birim = _birimFiyat(k);
+    final tutar = kg / 1000 * birim;
     final bos = kg <= 0;
+    final iskontolu = _iskontoDegeri != 0;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
@@ -162,9 +206,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               children: [
                 Text(k['kalite'] as String, style: const TextStyle(
                     fontSize: 13, fontWeight: FontWeight.w700)),
-                Text('${tlBicim.format(k['fiyat'])} TL/ton',
-                    style: MT.fiyat(size: 10.5,
-                        weight: FontWeight.w500, color: MT.soluk)),
+                Text(
+                    iskontolu
+                        ? '${tlBicim.format(k['fiyat'])} → ${tlBicim.format(birim)} TL/ton'
+                        : '${tlBicim.format(k['fiyat'])} TL/ton',
+                    style: MT.fiyat(size: 10.5, weight: FontWeight.w500,
+                        color: iskontolu ? MT.altin : MT.soluk)),
               ])),
           SizedBox(
             width: 92,

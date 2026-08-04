@@ -35,7 +35,15 @@ class _ArticlesScreenState extends State<ArticlesScreen>
       }
       final h = await Api.haberler();
       if (h['ok'] == true) {
-        _haber = (h['haberler'] as List).map((e) => Makale.json(e)).toList();
+        // Haberler sekmesinde yalnızca fabrika fiyat haberleri gösterilir;
+        // analiz yazıları MTEX Analiz sekmesinde zaten var.
+        _haber = (h['haberler'] as List)
+            .map((e) => Makale.json(e))
+            .where((m) {
+              final b = m.baslik.toLowerCase();
+              return b.contains('güncelledi') || b.contains('guncelledi');
+            })
+            .toList();
       }
     } catch (_) {}
     if (mounted) setState(() => _yukleniyor = false);
@@ -51,7 +59,10 @@ class _ArticlesScreenState extends State<ArticlesScreen>
             labelColor: MT.turuncu,
             unselectedLabelColor: MT.soluk,
             labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-            tabs: const [Tab(text: 'MTEX Analiz'), Tab(text: 'Haberler')],
+            tabs: const [
+              Tab(text: 'MTEX Analiz'),
+              Tab(text: 'Fabrika Haberleri'),
+            ],
           ),
         ),
         body: _yukleniyor

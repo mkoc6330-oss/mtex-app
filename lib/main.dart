@@ -97,6 +97,12 @@ class MtexApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: MT.tema(),
         home: const AnaIskelet(),
+        // Klavye açıkken herhangi bir boşluğa dokununca kapanır
+        builder: (context, child) => GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: child,
+        ),
       );
 }
 

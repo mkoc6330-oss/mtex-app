@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
@@ -42,20 +43,28 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext c) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _whatsapp,
+        backgroundColor: const Color(0xFF25D366),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.chat_rounded),
+        label: const Text('WhatsApp',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
       appBar: AppBar(
-        toolbarHeight: 62,
+        toolbarHeight: 74,
         title: Row(children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(9),
-            child: Image.asset('assets/logo.png', width: 36, height: 36),
+            borderRadius: BorderRadius.circular(11),
+            child: Image.asset('assets/logo.png', width: 46, height: 46),
           ),
-          const SizedBox(width: 11),
+          const SizedBox(width: 12),
           const Text.rich(TextSpan(children: [
             TextSpan(text: 'MTEX ',
-                style: TextStyle(fontSize: 22,
+                style: TextStyle(fontSize: 26,
                     fontWeight: FontWeight.w800, letterSpacing: .5)),
             TextSpan(text: 'HURDA',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800,
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800,
                     letterSpacing: .5, color: MT.altin)),
           ])),
         ]),
@@ -93,6 +102,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
       ),
     );
+  }
+
+  Future<void> _whatsapp() async {
+    final uri = Uri.parse('https://wa.me/905308632022');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
   }
 
   Widget _hataGorunumu() => ListView(children: [
