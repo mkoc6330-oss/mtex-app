@@ -55,6 +55,10 @@ Future<void> _bildirimKur() async {
   final fm = FirebaseMessaging.instance;
   await fm.requestPermission(alert: true, badge: true, sound: true);
 
+  // iOS: uygulama ön plandayken de sistem bildirimi göster
+  await fm.setForegroundNotificationPresentationOptions(
+      alert: true, badge: true, sound: true);
+
   const kanal = AndroidNotificationChannel(
     'fiyat', 'Fiyat Güncellemeleri',
     description: 'Fabrikalar fiyat güncellediğinde bildirim',
@@ -64,23 +68,29 @@ Future<void> _bildirimKur() async {
       .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(kanal);
 
-  await yerelBildirim.initialize(const InitializationSettings(
-    android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-    iOS: DarwinInitializationSettings(),
-  ));
+  await yerelBildirim.initialize(
+    settings: const InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      iOS: DarwinInitializationSettings(),
+    ),
+  );
 
-  // Uygulama açıkken gelen bildirimi göster
+  // Uygulama açıkken gelen bildirimi göster (Android; iOS'u sistem gösterir)
   FirebaseMessaging.onMessage.listen((m) {
     final n = m.notification;
     if (n == null) return;
-    yerelBildirim.show(
-      n.hashCode, n.title, n.body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails('fiyat', 'Fiyat Güncellemeleri',
-            importance: Importance.high, priority: Priority.high),
-        iOS: DarwinNotificationDetails(),
-      ),
-    );
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      yerelBildirim.show(
+        id: n.hashCode,
+        title: n.title,
+        body: n.body,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails('fiyat', 'Fiyat Güncellemeleri',
+              importance: Importance.high, priority: Priority.high),
+          iOS: DarwinNotificationDetails(),
+        ),
+      );
+    }
   });
 
   // iOS: APNs belirteci hazır olmadan abonelik/token işlemleri sessizce
