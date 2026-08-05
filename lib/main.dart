@@ -209,7 +209,8 @@ class AnaIskelet extends StatefulWidget {
 }
 
 class _AnaIskeletState extends State<AnaIskelet> {
-  int _sekme = 0;
+  // Ekran görüntüsü üretimi için derleme anında sekme seçilebilir
+  int _sekme = const int.fromEnvironment('SEKME', defaultValue: 0);
 
   final _ekranlar = const [
     HomeScreen(),

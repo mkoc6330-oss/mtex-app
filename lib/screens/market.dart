@@ -51,12 +51,12 @@ class _MarketScreenState extends State<MarketScreen> {
     return d is Map ? d[anahtar] as num? : null;
   }
 
-  /// Gram altın TL — ons USD ve kurdan anlık hesap
+  /// Gram altın TL — ons USD ve kurdan anlık hesap (tam sayıya yuvarlanır)
   String _gramAltin(Map<String, dynamic>? doviz, Map<String, dynamic>? emtia) {
     final ons = emtia?['altin_ons'] as num?;
     final usd = doviz?['usdtry'] as num?;
     if (ons == null || usd == null) return '—';
-    return tlBicim.format(ons / 31.1034768 * usd);
+    return tlBicim.format((ons / 31.1034768 * usd).round());
   }
 
   String _f(dynamic x, {int ondalik = 0}) {
