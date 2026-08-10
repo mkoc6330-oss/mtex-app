@@ -32,5 +32,6 @@ Hurda/çelik/emtia fiyat uygulaması (Flutter, iOS + Android). Sahibi: ERKOÇ HU
 - [x] Backend: `doviz.degisim` alanı geldi — rozetler çalışıyor
 - [ ] Gökhan Koç ASC davetini kabul edince MTEX Test grubuna ekle
 - [ ] TestFlight "Test Information" formu (dış test için; App Store gönderimi yapıldı, engel değil)
-- [ ] Google Play: Android keystore + yayın akışı
+- [x] Google Play: keystore (C:\mtex_keys\mtex-upload.jks) + kapalı test Alpha YAYINDA (2026-08-07, AAB 12). Katılım linki: https://play.google.com/apps/testing/io.metalexchange.mtex
+- [ ] Play üretim: 12+ testçi gmail'ini Console > Kapalı test > MTEX Test listesine ekle; 14 gün sonra "Üretime başvur"
 - [ ] Depoyu Private yap (kullanıcı onaylarsa)
