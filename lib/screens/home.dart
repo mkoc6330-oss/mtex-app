@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../models.dart';
@@ -18,11 +19,39 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _fab = [];
   bool _yukleniyor = true;
   String? _hata;
+  String _arama = '';
+  Set<int> _favoriler = {};
+  final _aramaDenetleyici = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _favorileriYukle();
     _yukle();
+  }
+
+  @override
+  void dispose() {
+    _aramaDenetleyici.dispose();
+    super.dispose();
+  }
+
+  Future<void> _favorileriYukle() async {
+    final sp = await SharedPreferences.getInstance();
+    final kayitli = sp.getStringList('favori_fabrikalar') ?? [];
+    if (mounted) {
+      setState(() =>
+          _favoriler = kayitli.map(int.parse).toSet());
+    }
+  }
+
+  Future<void> _favoriDegistir(int fabrikaId) async {
+    setState(() {
+      if (!_favoriler.remove(fabrikaId)) _favoriler.add(fabrikaId);
+    });
+    final sp = await SharedPreferences.getInstance();
+    await sp.setStringList(
+        'favori_fabrikalar', _favoriler.map((e) => '$e').toList());
   }
 
   Future<void> _yukle({bool yenile = false}) async {
@@ -81,26 +110,71 @@ class _HomeScreenState extends State<HomeScreen> {
             ? const Center(child: CircularProgressIndicator(color: MT.turuncu))
             : _hata != null && _fab.isEmpty
                 ? _hataGorunumu()
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4, bottom: 8),
-                        child: Text('Fabrika Sıralaması · ${_fab.length} tesis',
-                            style: const TextStyle(
-                                fontSize: 15.5, fontWeight: FontWeight.w700)),
-                      ),
-                      for (var i = 0; i < _fab.length; i++)
-                        _fabrikaKarti(i, _fab[i]),
-                      if (_fab.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.all(28),
-                          child: Center(child: Text('Bu kalite için fiyat verisi yok',
-                              style: TextStyle(color: MT.soluk))),
-                        ),
-                    ],
-                  ),
+                : _listeGorunumu(),
       ),
+    );
+  }
+
+  Widget _listeGorunumu() {
+    final s = _arama.trim().toLowerCase();
+    final suzgecli = s.isEmpty
+        ? _fab
+        : _fab.where((m) {
+            final ad = (m['ad'] ?? '').toString().toLowerCase();
+            final bolge = (m['bolge'] ?? '').toString().toLowerCase();
+            return ad.contains(s) || bolge.contains(s);
+          }).toList();
+    final favoriListe = suzgecli
+        .where((m) => _favoriler.contains(m['id'] as int))
+        .toList();
+    final digerleri = suzgecli
+        .where((m) => !_favoriler.contains(m['id'] as int))
+        .toList();
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
+      children: [
+        TextField(
+          controller: _aramaDenetleyici,
+          onChanged: (v) => setState(() => _arama = v),
+          decoration: InputDecoration(
+            hintText: 'Fabrika veya bölge ara',
+            prefixIcon: const Icon(Icons.search, color: MT.soluk, size: 21),
+            suffixIcon: _arama.isEmpty
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.close, color: MT.soluk, size: 19),
+                    onPressed: () {
+                      _aramaDenetleyici.clear();
+                      setState(() => _arama = '');
+                    }),
+            isDense: true,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (favoriListe.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 8),
+            child: Text('★ Favorilerim',
+                style: TextStyle(fontSize: 15.5,
+                    fontWeight: FontWeight.w700, color: MT.altin)),
+          ),
+          for (final m in favoriListe) _fabrikaKarti(_fab.indexOf(m), m),
+          const SizedBox(height: 8),
+        ],
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text('Fabrika Sıralaması · ${_fab.length} tesis',
+              style: const TextStyle(
+                  fontSize: 15.5, fontWeight: FontWeight.w700)),
+        ),
+        for (final m in digerleri) _fabrikaKarti(_fab.indexOf(m), m),
+        if (suzgecli.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(28),
+            child: Center(child: Text('Aramayla eşleşen fabrika yok',
+                style: TextStyle(color: MT.soluk))),
+          ),
+      ],
     );
   }
 
@@ -166,8 +240,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(kalite, style: const TextStyle(
                     fontSize: 10.5, fontWeight: FontWeight.w600, color: MT.soluk)),
             ]),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right, color: MT.soluk, size: 20),
+            const SizedBox(width: 2),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              onPressed: () => _favoriDegistir(f.id),
+              icon: Icon(
+                _favoriler.contains(f.id) ? Icons.star : Icons.star_border,
+                color: _favoriler.contains(f.id) ? MT.altin : MT.soluk,
+                size: 21,
+              ),
+            ),
           ]),
         ),
       ),

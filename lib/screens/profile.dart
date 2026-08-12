@@ -66,6 +66,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) setState(() { _uye = null; _mesaj = null; });
   }
 
+  /// Apple 5.1.1(v): hesap oluşturma sunan uygulama hesap silmeyi de sunmalı.
+  Future<void> _hesapSil() async {
+    final onay = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('Hesabınız silinsin mi?'),
+        content: const Text(
+            'Hesabınız ve ad, e-posta, telefon dahil tüm kişisel verileriniz '
+            'kalıcı olarak silinir. Bu işlem geri alınamaz.\n\n'
+            'Fiyatları görüntülemeye üyeliksiz devam edebilirsiniz.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(d, false),
+              child: const Text('Vazgeç')),
+          TextButton(
+              onPressed: () => Navigator.pop(d, true),
+              child: const Text('Hesabımı Kalıcı Olarak Sil',
+                  style: TextStyle(color: MT.kirmizi))),
+        ],
+      ),
+    );
+    if (onay != true || !mounted) return;
+    setState(() => _islemde = true);
+    String bilgi;
+    try {
+      final j = await Api.hesapSil();
+      if (j['ok'] == true) {
+        _uye = null;
+        bilgi = 'Hesabınız ve verileriniz kalıcı olarak silindi';
+      } else {
+        bilgi = (j['mesaj'] ?? 'Hesap silinemedi, lütfen tekrar deneyin').toString();
+      }
+    } catch (_) {
+      bilgi = 'Bağlantı kurulamadı, lütfen tekrar deneyin';
+    }
+    if (!mounted) return;
+    setState(() => _islemde = false);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(bilgi)));
+  }
+
   @override
   Widget build(BuildContext c) {
     return Scaffold(
@@ -197,6 +238,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.symmetric(vertical: 13),
         ),
         label: const Text('Çıkış Yap'),
+      ),
+      const SizedBox(height: 10),
+      TextButton.icon(
+        onPressed: _islemde ? null : _hesapSil,
+        icon: const Icon(Icons.delete_forever_outlined, size: 18),
+        style: TextButton.styleFrom(foregroundColor: MT.kirmizi),
+        label: const Text('Hesabımı Sil',
+            style: TextStyle(fontSize: 13.5)),
       ),
       const SizedBox(height: 20),
       const Center(child: Text('MTEX · metalexchange.io',

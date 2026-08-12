@@ -192,6 +192,14 @@ class Api {
 
   static Future<Map<String, dynamic>> ben() => _al('me');
 
+  /// Hesabı ve bağlı kişisel verileri KALICI olarak siler (geri alınamaz).
+  /// Başarıda oturum da kapatılır.
+  static Future<Map<String, dynamic>> hesapSil() async {
+    final j = await _gonder('auth/account', {}, metot: 'DELETE');
+    if (j['ok'] == true) await _tokenKaydet(null);
+    return j;
+  }
+
   // ---------- Push cihaz kaydı ----------
   // Giriş şartı yok: bildirimler üye olmayan kullanıcılara da gider.
   static Future<void> cihazKaydet(String pushToken, String platform) async {
