@@ -271,7 +271,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
           const SizedBox(height: 6),
           const Text(
-            'Fiyat güncelleme bildirimleri ve kişisel takip için üye ol',
+            'Üyelik isteğe bağlıdır — fiyatlar, bildirimler ve eksper hesabı '
+            'üye olmadan da tam çalışır. Üyelik yalnızca kişisel takip içindir.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13.5, color: MT.soluk, height: 1.5)),
           const SizedBox(height: 24),
@@ -280,10 +281,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: const InputDecoration(labelText: 'Ad Soyad')),
             const SizedBox(height: 11),
             TextField(controller: _telefon, keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Telefon')),
-            const SizedBox(height: 11),
+                decoration: const InputDecoration(
+                    labelText: 'Telefon (isteğe bağlı)',
+                    helperText: 'Boş bırakabilirsiniz')),
+            const SizedBox(height: 14),
             TextField(controller: _firma,
-                decoration: const InputDecoration(labelText: 'Firma (opsiyonel)')),
+                decoration: const InputDecoration(
+                    labelText: 'Firma (isteğe bağlı)')),
             const SizedBox(height: 11),
           ],
           TextField(controller: _eposta, keyboardType: TextInputType.emailAddress,
