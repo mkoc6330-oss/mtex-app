@@ -28,7 +28,7 @@ Hurda/çelik/emtia fiyat uygulaması (Flutter, iOS + Android). Sahibi: ERKOÇ HU
 - Yerel geliştirme (bu PC): Flutter C:\src\flutter (PATH'te yok), önizleme: `flutter build web --release` + launch.json "mtex-web" (port 5173).
 
 ## Bekleyen işler
-- [x] App Store yayını: v1.0 (Build 12) 2026-08-06'da incelemeye GÖNDERİLDİ ("Waiting for Review", onayda otomatik yayın; sonuç dogan.koc@hotmail.com'a gelir). Mağaza varlıkları store/eski/ içinde.
+- [x] 🎉 App Store: v1.0 (Build 14) 2026-08-15'te ONAYLANDI, YAYINDA → https://apps.apple.com/tr/app/mtex-hurda/id6797546984
 - [x] Backend: `doviz.degisim` alanı geldi — rozetler çalışıyor
 - [ ] Gökhan Koç ASC davetini kabul edince MTEX Test grubuna ekle
 - [ ] TestFlight "Test Information" formu (dış test için; App Store gönderimi yapıldı, engel değil)
