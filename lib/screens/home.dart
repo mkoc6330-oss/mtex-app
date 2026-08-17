@@ -198,12 +198,30 @@ class _HomeScreenState extends State<HomeScreen> {
         )),
       ]);
 
+  /// Fabrika bugün fiyat güncellediyse kart 24 saatliğine yeşil vurgulanır
+  bool _bugunGuncellendi(Map<String, dynamic> m) {
+    final t = (m['son_tarih'] ?? m['tarih'] ?? '').toString();
+    if (t.isEmpty) return false;
+    final simdi = DateTime.now();
+    final bugun = '${simdi.year.toString().padLeft(4, '0')}-'
+        '${simdi.month.toString().padLeft(2, '0')}-'
+        '${simdi.day.toString().padLeft(2, '0')}';
+    return t == bugun;
+  }
+
   Widget _fabrikaKarti(int indeks, Map<String, dynamic> m) {
     final f = Fabrika.json(m);
     final sira = indeks + 1;
     final kalite = (m['kalite'] ?? '').toString();
+    final guncel = _bugunGuncellendi(m);
     return Card(
       margin: const EdgeInsets.only(bottom: 9),
+      color: guncel ? const Color(0xFF16251F) : null,
+      shape: guncel
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(13),
+              side: BorderSide(color: MT.yesil.withValues(alpha: .55)))
+          : null,
       child: InkWell(
         borderRadius: BorderRadius.circular(13),
         onTap: () => Navigator.push(context, MaterialPageRoute(
@@ -228,7 +246,26 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(f.ad, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              Row(children: [
+                Flexible(child: Text(f.ad,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700))),
+                if (guncel) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5.5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: MT.yesil.withValues(alpha: .16),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: const Text('GÜNCEL', style: TextStyle(
+                        fontSize: 8.5, fontWeight: FontWeight.w800,
+                        letterSpacing: .5, color: MT.yesil)),
+                  ),
+                ],
+              ]),
               if (f.bolge != null && f.bolge!.isNotEmpty)
                 Text(f.bolge!, style: const TextStyle(fontSize: 11.5, color: MT.soluk)),
             ])),

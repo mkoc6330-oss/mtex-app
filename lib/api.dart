@@ -103,14 +103,27 @@ class Api {
     }));
 
     final birlesik = <int, Map<String, dynamic>>{};
+    // YYYY-AA-GG dizgileri sözlük sırasıyla karşılaştırılabilir
+    String? enYeni(String? a, String? b) {
+      if (a == null || a.isEmpty) return b;
+      if (b == null || b.isEmpty) return a;
+      return a.compareTo(b) >= 0 ? a : b;
+    }
+
     for (final s in yanitlar.whereType<Map<String, dynamic>>()) {
       final y = s['yanit'] as Map<String, dynamic>;
       for (final f in (y['fabrikalar'] as List).cast<Map<String, dynamic>>()) {
         final id = f['id'] as int;
         final fiyat = (f['fiyat'] ?? 0) as num;
         final mevcut = birlesik[id];
+        // son_tarih: fabrikanın HERHANGİ bir kalitesindeki en yeni
+        // güncelleme günü ("bugün güncelledi" vurgusu bunu kullanır)
+        final sonTarih = enYeni(
+            mevcut?['son_tarih'] as String?, f['tarih'] as String?);
         if (mevcut == null || fiyat > (mevcut['fiyat'] as num)) {
-          birlesik[id] = {...f, 'kalite': s['kalite']};
+          birlesik[id] = {...f, 'kalite': s['kalite'], 'son_tarih': sonTarih};
+        } else if (sonTarih != mevcut['son_tarih']) {
+          birlesik[id] = {...mevcut, 'son_tarih': sonTarih};
         }
       }
     }
