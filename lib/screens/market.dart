@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../api.dart';
 import '../theme.dart';
 import 'home.dart' show tlBicim;
@@ -12,15 +13,21 @@ class MarketScreen extends StatefulWidget {
   State<MarketScreen> createState() => _MarketScreenState();
 }
 
-class _MarketScreenState extends State<MarketScreen> {
+class _MarketScreenState extends State<MarketScreen>
+    with WidgetsBindingObserver {
   Map<String, dynamic>? _v;
   bool _yukleniyor = true;
   Timer? _zamanlayici;
   DateTime? _sonVeri;
 
+  /// İthal hurda (USD) yön bilgisi: 'yukselis' | 'dusus' | null.
+  /// Son görülen değerle karşılaştırılır, yön kalıcı saklanır.
+  String? _ithalTrend;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _yukle();
     // Canlı veri: 30 saniyede bir sessizce yenile
     _zamanlayici = Timer.periodic(
@@ -29,8 +36,16 @@ class _MarketScreenState extends State<MarketScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _zamanlayici?.cancel();
     super.dispose();
+  }
+
+  /// Uygulama arka plandan öne gelince hemen yenile — iOS arka planda
+  /// zamanlayıcıyı durdurduğu için saat/veri bayat kalıyordu
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _yukle(sessiz: true);
   }
 
   Future<void> _yukle({bool sessiz = false}) async {
@@ -40,9 +55,28 @@ class _MarketScreenState extends State<MarketScreen> {
       if (j['ok'] == true) {
         _v = j;
         _sonVeri = DateTime.now();
+        await _ithalTrendGuncelle(j);
       }
     } catch (_) {}
     if (mounted) setState(() => _yukleniyor = false);
+  }
+
+  Future<void> _ithalTrendGuncelle(Map<String, dynamic> j) async {
+    final ithal =
+        ((j['hurda'] as Map<String, dynamic>?)?['ithal_usd'] as num?)
+            ?.toDouble();
+    if (ithal == null) return;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final onceki = sp.getDouble('ithal_son');
+      if (onceki != null && ithal != onceki) {
+        _ithalTrend = ithal > onceki ? 'yukselis' : 'dusus';
+        await sp.setString('ithal_trend', _ithalTrend!);
+      } else {
+        _ithalTrend ??= sp.getString('ithal_trend');
+      }
+      await sp.setDouble('ithal_son', ithal);
+    } catch (_) {}
   }
 
   /// Kurun günlük değişim yüzdesi (API `doviz.degisim` sağlıyorsa)
@@ -195,14 +229,22 @@ class _MarketScreenState extends State<MarketScreen> {
         const SizedBox(height: 5),
         Text((p['formul'] ?? '').toString(),
             style: const TextStyle(fontSize: 12, color: MT.soluk)),
-        if (p['dolar_maliyet'] is num) ...[
+        if (_ithalTrend != null) ...[
           const SizedBox(height: 7),
           Row(children: [
-            const Icon(Icons.swap_vert_rounded, size: 14, color: MT.altin),
+            Icon(
+                _ithalTrend == 'yukselis'
+                    ? Icons.trending_up_rounded
+                    : Icons.trending_down_rounded,
+                size: 15,
+                color: _ithalTrend == 'yukselis' ? MT.yesil : MT.kirmizi),
             const SizedBox(width: 5),
             Expanded(child: Text(
-              'Dolar 0,10 ₺ oynarsa parite ≈ ${_f((p['dolar_maliyet'] as num) * 0.1, ondalik: 1)} TL/ton değişir',
-              style: const TextStyle(fontSize: 12, color: MT.soluk),
+              _ithalTrend == 'yukselis'
+                  ? 'Yurt dışı hurda fiyatında yükseliş eğilimi var'
+                  : 'Yurt dışı hurda fiyatında düşüş eğilimi var',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                  color: _ithalTrend == 'yukselis' ? MT.yesil : MT.kirmizi),
             )),
           ]),
         ],

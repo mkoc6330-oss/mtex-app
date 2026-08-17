@@ -45,11 +45,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   Future<void> _fabrikalariYukle() async {
     try {
-      final f = await Api.fabrikalar();
-      if (f['ok'] == true) {
-        _fabrikalar =
-            (f['fabrikalar'] as List).map((e) => Fabrika.json(e)).toList();
-      }
+      // Tüm kaliteler birleştirilir: ana ekranla aynı 16 fabrika,
+      // öncelik sırasına göre (tek kalite listesi 11 fabrikada kalıyordu)
+      final liste = await Api.tumFabrikalar();
+      _fabrikalar = liste.map((e) => Fabrika.json(e)).toList();
     } catch (_) {}
     if (mounted) setState(() => _fabYukleniyor = false);
     if (_fabrikalar.isNotEmpty) _fabrikaSec(_fabrikalar.first);
