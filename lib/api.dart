@@ -99,15 +99,19 @@ class Api {
         }
 
         final gorselEl = o.findElements('enclosure');
+        final link = metin('link');
         liste.add({
           'baslik': metin('title'),
           'ozet': metin('description'),
-          'link': metin('link'),
+          'link': link,
           'kategori': metin('category'),
           'tarih': _rssTarih(metin('pubDate')),
           'gorsel': gorselEl.isEmpty
               ? null
               : gorselEl.first.getAttribute('url'),
+          // Haber MTEX'e aitse (kendi sitemizdeki haber sayfası) uygulama
+          // içinde tam metin açılabilsin diye id çıkarılır.
+          'id': _mtexHaberId(link),
         });
       }
       if (liste.isNotEmpty) {
@@ -118,6 +122,14 @@ class Api {
     } catch (_) {
       return _akisCache ?? [];
     }
+  }
+
+  /// Bağlantı MTEX'in kendi haber sayfasıysa haber id'sini döndürür
+  /// (…/haber.php?id=51378). Değilse null → kaynak sitede açılır.
+  static int? _mtexHaberId(String link) {
+    if (!link.contains('metalexchange.io')) return null;
+    final m = RegExp(r'[?&]id=(\d+)').firstMatch(link);
+    return m == null ? null : int.tryParse(m.group(1)!);
   }
 
   /// "Tue, 18 Aug 2026 06:49:00 +0000" → DateTime (yerel saat)

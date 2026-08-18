@@ -7,6 +7,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets/son_dakika.dart';
 import 'factory_detail.dart';
+import 'news_detail.dart';
 
 final tlBicim = NumberFormat.decimalPattern('tr_TR');
 
@@ -35,6 +36,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _haberleriYukle();
   }
 
+  /// Ana ekran manşetleri: sitenin ana sayfasındaki genel piyasa/ekonomi akışı.
+  /// (MTEX'in kendi analiz ve fabrika haberleri Analiz sekmesinde.)
+  /// Kayıtta `id` varsa haber MTEX'e aittir → uygulama içinde tam metin açılır;
+  /// yoksa kaynak sitede uygulama içi tarayıcıyla gösterilir.
   Future<void> _haberleriYukle({bool yenile = false}) async {
     try {
       final h = await Api.canliHaberler(yenile: yenile);
@@ -270,7 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
         margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => _haberAc((h['link'] ?? '').toString()),
+          onTap: () => _habereGit(h),
           child: Stack(fit: StackFit.expand, children: [
             if (gorsel != null && gorsel.isNotEmpty)
               Image.network(gorsel, fit: BoxFit.cover,
@@ -344,8 +349,24 @@ class _HomeScreenState extends State<HomeScreen> {
     return DateFormat('dd.MM.yyyy').format(t);
   }
 
-  /// Haber uygulamadan çıkmadan açılır (iOS: Safari görünümü, Android: Custom
-  /// Tab). Kapatınca kullanıcı MTEX'te kaldığı yerden devam eder.
+  /// MTEX haberi → uygulama içi tam metin okuyucu (yönlendirme yok).
+  /// Dış kaynaklı haber → uygulama içi tarayıcı görünümü.
+  void _habereGit(Map<String, dynamic> h) {
+    if (h['id'] != null) {
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => NewsDetailScreen(
+          id: h['id'] as int,
+          baslik: (h['baslik'] ?? '').toString(),
+          gorsel: h['gorsel'] as String?,
+        ),
+      ));
+    } else {
+      _haberAc((h['link'] ?? '').toString());
+    }
+  }
+
+  /// Dış bağlantı uygulamadan çıkmadan açılır (iOS: Safari görünümü,
+  /// Android: Custom Tab). Kapatınca kullanıcı MTEX'te kaldığı yerde devam eder.
   Future<void> _haberAc(String url) async {
     if (url.isEmpty) return;
     try {

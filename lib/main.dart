@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'api.dart';
 import 'firebase_options.dart';
 import 'models.dart';
@@ -57,6 +58,7 @@ bool get _mobilPlatform =>
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('tr'); // haber tarihleri Türkçe yazılsın
   await Api.baslat();
 
   // Arayüz her koşulda açılır; Firebase/bildirim kurulumu arkada yapılır.
