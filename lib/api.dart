@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xml/xml.dart';
 
 /// MTEX API servis katmanı — metalexchange.io/api/v1
 class Api {
@@ -69,6 +70,72 @@ class Api {
           '${kaliteId != null ? '&quality=$kaliteId' : ''}');
   static Future<Map<String, dynamic>> haberler({int limit = 20}) =>
       _al('news?limit=$limit');
+
+  // ---------- Canlı haber akışı (web sitesinin ana sayfa beslemesi) ----------
+  static const _haberAkisi = 'https://metalexchange.io/prototip/news_live.php';
+  static List<Map<String, dynamic>>? _akisCache;
+  static DateTime? _akisZamani;
+
+  /// Sitedeki "Son haberler" bölümüyle aynı RSS beslemesi.
+  /// Dönen kayıtlar: {baslik, ozet, gorsel, link, kategori, tarih}
+  /// 10 dakika önbellekte tutulur.
+  static Future<List<Map<String, dynamic>>> canliHaberler(
+      {bool yenile = false}) async {
+    if (!yenile &&
+        _akisCache != null &&
+        DateTime.now().difference(_akisZamani!).inMinutes < 10) {
+      return _akisCache!;
+    }
+    try {
+      final r = await http
+          .get(Uri.parse(_haberAkisi))
+          .timeout(const Duration(seconds: 20));
+      final belge = XmlDocument.parse(utf8.decode(r.bodyBytes));
+      final liste = <Map<String, dynamic>>[];
+      for (final o in belge.findAllElements('item')) {
+        String metin(String ad) {
+          final e = o.findElements(ad);
+          return e.isEmpty ? '' : e.first.innerText.trim();
+        }
+
+        final gorselEl = o.findElements('enclosure');
+        liste.add({
+          'baslik': metin('title'),
+          'ozet': metin('description'),
+          'link': metin('link'),
+          'kategori': metin('category'),
+          'tarih': _rssTarih(metin('pubDate')),
+          'gorsel': gorselEl.isEmpty
+              ? null
+              : gorselEl.first.getAttribute('url'),
+        });
+      }
+      if (liste.isNotEmpty) {
+        _akisCache = liste;
+        _akisZamani = DateTime.now();
+      }
+      return liste;
+    } catch (_) {
+      return _akisCache ?? [];
+    }
+  }
+
+  /// "Tue, 18 Aug 2026 06:49:00 +0000" → DateTime (yerel saat)
+  static DateTime? _rssTarih(String s) {
+    if (s.isEmpty) return null;
+    const aylar = {
+      'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+      'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12,
+    };
+    final m = RegExp(r'(\d{1,2})\s+(\w{3})\s+(\d{4})\s+(\d{2}):(\d{2})')
+        .firstMatch(s);
+    if (m == null) return null;
+    final ay = aylar[m.group(2)];
+    if (ay == null) return null;
+    return DateTime.utc(int.parse(m.group(3)!), ay, int.parse(m.group(1)!),
+            int.parse(m.group(4)!), int.parse(m.group(5)!))
+        .toLocal();
+  }
   static Future<Map<String, dynamic>> haber(int id) => _al('news/$id');
   static Future<Map<String, dynamic>> analizler({int limit = 15}) =>
       _al('analyses?limit=$limit');

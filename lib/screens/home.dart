@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../widgets/son_dakika.dart';
 import 'factory_detail.dart';
 
 final tlBicim = NumberFormat.decimalPattern('tr_TR');
@@ -22,17 +23,53 @@ class _HomeScreenState extends State<HomeScreen> {
   String _arama = '';
   Set<int> _favoriler = {};
   final _aramaDenetleyici = TextEditingController();
+  final _haberSayfa = PageController(viewportFraction: .97);
+  List<Map<String, dynamic>> _haberler = [];
+  List<String> _sonDakika = [];
 
   @override
   void initState() {
     super.initState();
     _favorileriYukle();
     _yukle();
+    _haberleriYukle();
+  }
+
+  Future<void> _haberleriYukle({bool yenile = false}) async {
+    try {
+      final h = await Api.canliHaberler(yenile: yenile);
+      if (mounted) setState(() => _haberler = h);
+    } catch (_) {}
+    _sonDakikaYukle();
+  }
+
+  /// SON DAKİKA şeridi: fabrika fiyat güncellemeleri (site başlığıyla aynı)
+  Future<void> _sonDakikaYukle() async {
+    try {
+      final j = await Api.guncellemeler(limit: 40);
+      if (j['ok'] != true) return;
+      final gorulen = <String>{};
+      final maddeler = <String>[];
+      for (final g in (j['guncellemeler'] as List)
+          .cast<Map<String, dynamic>>()) {
+        final ad = (g['fabrika'] ?? '').toString();
+        if (ad.isEmpty || !gorulen.add(ad)) continue; // fabrika başına tek satır
+        final fark = (g['fark'] ?? 0) as num;
+        maddeler.add(fark >= 0
+            ? '$ad hurda fiyatını yükseltti ▲'
+            : '$ad hurda fiyatını düşürdü ▼');
+        if (maddeler.length >= 10) break;
+      }
+      if (mounted && maddeler.isNotEmpty) {
+        setState(() => _sonDakika = maddeler);
+      }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _aramaDenetleyici.dispose();
+    _haberSayfa.dispose();
     super.dispose();
   }
 
@@ -105,7 +142,10 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         color: MT.turuncu,
         backgroundColor: MT.kart,
-        onRefresh: () => _yukle(yenile: true),
+        onRefresh: () async {
+          await Future.wait(
+              [_yukle(yenile: true), _haberleriYukle(yenile: true)]);
+        },
         child: _yukleniyor && _fab.isEmpty
             ? const Center(child: CircularProgressIndicator(color: MT.turuncu))
             : _hata != null && _fab.isEmpty
@@ -151,6 +191,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 12),
+        if (_sonDakika.isNotEmpty && _arama.isEmpty) ...[
+          SonDakikaSeridi(maddeler: _sonDakika),
+          const SizedBox(height: 14),
+        ],
+        if (_haberler.isNotEmpty && _arama.isEmpty) ...[
+          _haberSeridi(),
+          const SizedBox(height: 14),
+        ],
         if (favoriListe.isNotEmpty) ...[
           const Padding(
             padding: EdgeInsets.only(left: 4, bottom: 8),
@@ -176,6 +224,137 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
       ],
     );
+  }
+
+  /// Site ana sayfasıyla aynı düzen: kaydırmalı manşetler (20 haber)
+  Widget _haberSeridi() {
+    final mansetler = _haberler.take(20).toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.only(left: 2, bottom: 10),
+        child: Row(children: [
+          Container(width: 3.5, height: 17,
+              decoration: BoxDecoration(
+                  color: MT.kirmizi, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(width: 8),
+          const Text('Son haberler',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+          const Spacer(),
+          InkWell(
+            onTap: () => _haberAc('https://metalexchange.io/#haberler'),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: Text('tüm haberler →',
+                  style: TextStyle(fontSize: 12, color: MT.soluk)),
+            ),
+          ),
+        ]),
+      ),
+      SizedBox(
+        height: 236,
+        child: PageView.builder(
+          controller: _haberSayfa,
+          itemCount: mansetler.length,
+          itemBuilder: (_, i) =>
+              _mansetKarti(mansetler[i], i + 1, mansetler.length),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _mansetKarti(Map<String, dynamic> h, int sira, int toplam) {
+    final gorsel = h['gorsel'] as String?;
+    return Padding(
+      padding: const EdgeInsets.only(right: 2),
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _haberAc((h['link'] ?? '').toString()),
+          child: Stack(fit: StackFit.expand, children: [
+            if (gorsel != null && gorsel.isNotEmpty)
+              Image.network(gorsel, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _haberGorselYok())
+            else
+              _haberGorselYok(),
+            // Yazıların okunabilmesi için koyu geçiş
+            Container(decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                colors: [Color(0x22000000), Color(0xCC0B0F18), Color(0xF2080B12)],
+                stops: [0, .48, 1],
+              ),
+            )),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(15, 14, 15, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text((h['baslik'] ?? '').toString(),
+                      maxLines: 3, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 17.5,
+                          fontWeight: FontWeight.w800, height: 1.25,
+                          color: Colors.white)),
+                  const SizedBox(height: 7),
+                  Text((h['ozet'] ?? '').toString(),
+                      maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12.5,
+                          height: 1.42, color: Color(0xFFB9C2D0))),
+                  const SizedBox(height: 11),
+                  Row(children: [
+                    Text(_zamanFarki(h['tarih'] as DateTime?),
+                        style: const TextStyle(fontSize: 11.5, color: MT.soluk)),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .10),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text('$sira / $toplam',
+                          style: MT.fiyat(size: 10.5,
+                              weight: FontWeight.w700, color: Colors.white)),
+                    ),
+                  ]),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+
+
+  Widget _haberGorselYok() => Container(
+        color: const Color(0xFF1E2839),
+        alignment: Alignment.center,
+        child: const Icon(Icons.newspaper_rounded, size: 30, color: MT.soluk),
+      );
+
+  String _zamanFarki(DateTime? t) {
+    if (t == null) return '';
+    final d = DateTime.now().difference(t);
+    if (d.inMinutes < 60) return '${d.inMinutes} dk önce';
+    if (d.inHours < 24) return '${d.inHours} saat önce';
+    if (d.inDays < 7) return '${d.inDays} gün önce';
+    return DateFormat('dd.MM.yyyy').format(t);
+  }
+
+  /// Haber uygulamadan çıkmadan açılır (iOS: Safari görünümü, Android: Custom
+  /// Tab). Kapatınca kullanıcı MTEX'te kaldığı yerden devam eder.
+  Future<void> _haberAc(String url) async {
+    if (url.isEmpty) return;
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.inAppBrowserView);
+    } catch (_) {
+      try {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      } catch (_) {}
+    }
   }
 
   Future<void> _whatsapp() async {
