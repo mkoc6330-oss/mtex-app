@@ -16,6 +16,8 @@ class FactoryDetailScreen extends StatefulWidget {
 class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
   List<Map<String, dynamic>> _kaliteler = [];
   bool _kaliteYukleniyor = true;
+  /// kalite_id → son fiyat değişimi (+ yükseliş / − düşüş)
+  Map<int, num> _degisim = {};
 
   int? _seciliKaliteId;
   String? _seciliKaliteAd;
@@ -39,6 +41,8 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
         });
       }
       if (liste.isNotEmpty) {
+        // Kalite rozetleri için son değişimler arka planda hesaplanır
+        _degisimleriYukle(liste);
         final ilk = liste.firstWhere(
           (k) => k['kalite_id'] == widget.kaliteId,
           orElse: () => liste.first,
@@ -55,6 +59,14 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
         });
       }
     }
+  }
+
+  Future<void> _degisimleriYukle(List<Map<String, dynamic>> liste) async {
+    try {
+      final d = await Api.kaliteDegisimleri(widget.fabrika.id,
+          liste.map((k) => k['kalite_id'] as int).toList());
+      if (mounted) setState(() => _degisim = d);
+    } catch (_) {}
   }
 
   Future<void> _grafikYukle(int kaliteId, String kaliteAd, {int? gun}) async {
@@ -357,6 +369,26 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
     );
   }
 
+  /// Son fiyat değişimi: yükseliş yeşil ▲, düşüş kırmızı ▼
+  Widget _degisimRozeti(num fark) {
+    final artis = fark > 0;
+    final renk = artis ? MT.yesil : MT.kirmizi;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: renk.withValues(alpha: .13),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(artis ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+            size: 10, color: renk),
+        const SizedBox(width: 2),
+        Text(tlBicim.format(fark.abs()),
+            style: MT.fiyat(size: 10, weight: FontWeight.w700, color: renk)),
+      ]),
+    );
+  }
+
   Widget _kaliteSatiri(Map<String, dynamic> k) {
     final secili = k['kalite_id'] == _seciliKaliteId;
     final enYuksek = _kaliteler.isNotEmpty && identical(k, _kaliteler.first);
@@ -384,9 +416,15 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
                     const Text('en yüksek alım', style: TextStyle(
                         fontSize: 10.5, color: MT.altin)),
                 ])),
-            Text('${tlBicim.format(k['fiyat'])} TL',
-                style: MT.fiyat(size: 14,
-                    color: enYuksek ? MT.altin : MT.yazi)),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text('${tlBicim.format(k['fiyat'])} TL',
+                  style: MT.fiyat(size: 14,
+                      color: enYuksek ? MT.altin : MT.yazi)),
+              if (_degisim[k['kalite_id']] != null) ...[
+                const SizedBox(height: 3),
+                _degisimRozeti(_degisim[k['kalite_id']]!),
+              ],
+            ]),
           ]),
         ),
       ),

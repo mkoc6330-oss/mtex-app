@@ -228,6 +228,33 @@ class Api {
     return sirali;
   }
 
+  /// Bir fabrikanın her kalitesi için SON fiyat değişimi (güncel − önceki).
+  /// Değişim geçmiş serisinden bulunur: sondan geriye gidilip fiyatın en son
+  /// hangi değerden değiştiği aranır. Hiç değişim yoksa kalite listeye girmez.
+  /// İstekler paralel gider, biri düşerse diğerleri etkilenmez.
+  static Future<Map<int, num>> kaliteDegisimleri(
+      int fabrikaId, List<int> kaliteIdler) async {
+    final sonuc = <int, num>{};
+    await Future.wait(kaliteIdler.map((kid) async {
+      try {
+        final j = await gecmis(fabrikaId, gun: 120, kaliteId: kid);
+        if (j['ok'] != true) return;
+        final seri = (j['seri'] as List? ?? const [])
+            .cast<Map<String, dynamic>>();
+        if (seri.length < 2) return;
+        final son = (seri.last['fiyat'] as num).toDouble();
+        for (var i = seri.length - 2; i >= 0; i--) {
+          final onceki = (seri[i]['fiyat'] as num).toDouble();
+          if (onceki != son) {
+            sonuc[kid] = son - onceki;
+            break;
+          }
+        }
+      } catch (_) {}
+    }));
+    return sonuc;
+  }
+
   /// Bir fabrikanın satın aldığı tüm kalitelerin güncel fiyatları.
   /// `factories/{id}` ucundan tek istekle gelir; fiyata göre azalan sıralıdır:
   /// [{'kalite_id': 1, 'kalite': 'DKP', 'fiyat': 17450, 'tarih': '2026-07-30'}, ...]

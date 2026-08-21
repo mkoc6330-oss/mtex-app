@@ -223,6 +223,24 @@ class _AnaIskeletState extends State<AnaIskelet> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Ekran görüntüsü üretimi: --dart-define=FABRIKA=10 verilirse açılışta
+    // o fabrikanın detayı açılır (varsayılan 0 = kapalı, yayında etkisiz).
+    const fabrikaId = int.fromEnvironment('FABRIKA', defaultValue: 0);
+    if (fabrikaId > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        navigatorKey.currentState?.push(MaterialPageRoute(
+          builder: (_) => FactoryDetailScreen(
+            fabrika: Fabrika.json(
+                {'id': fabrikaId, 'ad': '', 'slug': '', 'fiyat': 0, 'sira': 0}),
+          ),
+        ));
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext c) => Scaffold(
         body: IndexedStack(index: _sekme, children: _ekranlar),
         bottomNavigationBar: Container(
