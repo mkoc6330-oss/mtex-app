@@ -374,17 +374,18 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
     final artis = fark > 0;
     final renk = artis ? MT.yesil : MT.kirmizi;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.fromLTRB(6, 3, 8, 3),
       decoration: BoxDecoration(
-        color: renk.withValues(alpha: .13),
-        borderRadius: BorderRadius.circular(5),
+        color: renk.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: renk.withValues(alpha: .28)),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(artis ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-            size: 10, color: renk),
+            size: 11.5, color: renk),
         const SizedBox(width: 2),
         Text(tlBicim.format(fark.abs()),
-            style: MT.fiyat(size: 10, weight: FontWeight.w700, color: renk)),
+            style: MT.fiyat(size: 11, weight: FontWeight.w700, color: renk)),
       ]),
     );
   }
@@ -416,15 +417,14 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
                     const Text('en yüksek alım', style: TextStyle(
                         fontSize: 10.5, color: MT.altin)),
                 ])),
-            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text('${tlBicim.format(k['fiyat'])} TL',
-                  style: MT.fiyat(size: 14,
-                      color: enYuksek ? MT.altin : MT.yazi)),
-              if (_degisim[k['kalite_id']] != null) ...[
-                const SizedBox(height: 3),
-                _degisimRozeti(_degisim[k['kalite_id']]!),
-              ],
-            ]),
+            // Değişim rozeti kalite adı ile fiyatın arasında durur
+            if (_degisim[k['kalite_id']] != null) ...[
+              _degisimRozeti(_degisim[k['kalite_id']]!),
+              const SizedBox(width: 11),
+            ],
+            Text('${tlBicim.format(k['fiyat'])} TL',
+                style: MT.fiyat(size: 14,
+                    color: enYuksek ? MT.altin : MT.yazi)),
           ]),
         ),
       ),
