@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -186,6 +187,20 @@ Future<void> _bildirimKur() async {
   fm.onTokenRefresh.listen((t2) => Api.cihazKaydet(t2, 'mobil'));
 }
 
+/// Flutter varsayılanı web/masaüstünde FARE ile sürüklemeyi kapatır; haber
+/// manşetleri elle kaydırılamıyordu. Tüm işaretçi türleri açılır.
+class MtexKaydirma extends MaterialScrollBehavior {
+  const MtexKaydirma();
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.invertedStylus,
+      };
+}
+
 class MtexApp extends StatelessWidget {
   const MtexApp({super.key});
   @override
@@ -194,6 +209,7 @@ class MtexApp extends StatelessWidget {
         title: 'MTEX',
         debugShowCheckedModeBanner: false,
         theme: MT.tema(),
+        scrollBehavior: const MtexKaydirma(),
         home: const AnaIskelet(),
         // Klavye açıkken herhangi bir boşluğa dokununca kapanır
         builder: (context, child) => GestureDetector(
