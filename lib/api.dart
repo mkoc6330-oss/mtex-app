@@ -284,7 +284,8 @@ class Api {
 
   /// Bir fabrikanın her kalitesi için SON fiyat değişimi (güncel − önceki).
   /// Değişim geçmiş serisinden bulunur: sondan geriye gidilip fiyatın en son
-  /// hangi değerden değiştiği aranır. Hiç değişim yoksa kalite listeye girmez.
+  /// hangi değerden değiştiği aranır. Seri boyunca fiyat hiç değişmediyse
+  /// 0 döner — "değişim yok" ile "veri gelmedi" ayırt edilebilsin diye.
   /// İstekler paralel gider, biri düşerse diğerleri etkilenmez.
   static Future<Map<int, num>> kaliteDegisimleri(
       int fabrikaId, List<int> kaliteIdler) async {
@@ -297,6 +298,7 @@ class Api {
             .cast<Map<String, dynamic>>();
         if (seri.length < 2) return;
         final son = (seri.last['fiyat'] as num).toDouble();
+        sonuc[kid] = 0; // seri var; değişim bulunursa aşağıda güncellenir
         for (var i = seri.length - 2; i >= 0; i--) {
           final onceki = (seri[i]['fiyat'] as num).toDouble();
           if (onceki != son) {

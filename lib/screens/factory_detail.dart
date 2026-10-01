@@ -21,7 +21,8 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
 
   int? _seciliKaliteId;
   String? _seciliKaliteAd;
-  int _gun = 30;
+  /// Grafik tek dönem gösterir: son 90 gün
+  static const _gun = 90;
   List<Map<String, dynamic>> _seri = [];
   bool _seriYukleniyor = true;
 
@@ -69,11 +70,10 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
     } catch (_) {}
   }
 
-  Future<void> _grafikYukle(int kaliteId, String kaliteAd, {int? gun}) async {
+  Future<void> _grafikYukle(int kaliteId, String kaliteAd) async {
     setState(() {
       _seciliKaliteId = kaliteId;
       _seciliKaliteAd = kaliteAd;
-      if (gun != null) _gun = gun;
       _seriYukleniyor = true;
       _seri = [];
     });
@@ -172,10 +172,22 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
             ]),
             const SizedBox(height: 10),
             Row(children: [
-              for (final g in const [7, 30, 90]) ...[
-                _donemSecici(g),
-                const SizedBox(width: 7),
-              ],
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                decoration: BoxDecoration(
+                  color: MT.altin.withValues(alpha: .16),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: MT.altin),
+                ),
+                child: const Text('Son 90 Gün',
+                    style: TextStyle(fontSize: 11.5,
+                        fontWeight: FontWeight.w800, color: MT.altin)),
+              ),
+              const SizedBox(width: 9),
+              if (_degisimSayisi > 0)
+                Text('$_degisimSayisi değişim',
+                    style: const TextStyle(fontSize: 11.5, color: MT.soluk)),
               const Spacer(),
               if (son != null)
                 Text('Son: ${tlBicim.format(son)} TL',
@@ -198,27 +210,20 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
     );
   }
 
-  Widget _donemSecici(int g) {
-    final secili = _gun == g;
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: secili || _seciliKaliteId == null
-          ? null
-          : () => _grafikYukle(_seciliKaliteId!, _seciliKaliteAd!, gun: g),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-        decoration: BoxDecoration(
-          color: secili ? MT.altin.withValues(alpha: .16) : MT.bg,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: secili ? MT.altin : MT.cizgi),
-        ),
-        child: Text('$g Gün',
-            style: TextStyle(fontSize: 11.5,
-                fontWeight: secili ? FontWeight.w800 : FontWeight.w600,
-                color: secili ? MT.altin : MT.soluk)),
-      ),
-    );
+  /// Fiyatın bir önceki güne göre değiştiği günler: indeks → fark.
+  /// Fabrika fiyatı her gün değişmediği için seri basamaklı ilerler;
+  /// grafikte yalnızca bu günler işaretlenir.
+  Map<int, double> get _degisimGunleri {
+    final g = <int, double>{};
+    for (var i = 1; i < _seri.length; i++) {
+      final onceki = (_seri[i - 1]['fiyat'] as num).toDouble();
+      final simdi = (_seri[i]['fiyat'] as num).toDouble();
+      if (simdi != onceki) g[i] = simdi - onceki;
+    }
+    return g;
   }
+
+  int get _degisimSayisi => _degisimGunleri.length;
 
   /// "2026-08-15" → "15.08"
   String _kisaTarih(int indeks) {
@@ -237,6 +242,8 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
     final noktalar = [
       for (var i = 0; i < d.length; i++) FlSpot(i.toDouble(), d[i]),
     ];
+    final degisimler = _degisimGunleri;
+    final sonIndeks = (d.length - 1).toDouble();
 
     return LineChart(
       LineChartData(
@@ -252,6 +259,19 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
               const FlLine(color: Color(0x14FFFFFF), strokeWidth: 1),
         ),
         borderData: FlBorderData(show: false),
+        // Değişim günleri dikey kesikli çizgiyle de belirtilir
+        extraLinesData: ExtraLinesData(
+          verticalLines: [
+            for (final i in degisimler.keys)
+              VerticalLine(
+                x: i.toDouble(),
+                color: (degisimler[i]! > 0 ? MT.yesil : MT.kirmizi)
+                    .withValues(alpha: .22),
+                strokeWidth: 1,
+                dashArray: const [3, 3],
+              ),
+          ],
+        ),
         titlesData: FlTitlesData(
           topTitles:
               const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -311,6 +331,19 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
                       style: MT.fiyat(size: 13,
                           weight: FontWeight.w800, color: MT.altin),
                     ),
+                    if (degisimler[n.x.round()] != null)
+                      TextSpan(
+                        text: '\n'
+                            '${degisimler[n.x.round()]! > 0 ? '▲ +' : '▼ '}'
+                            '${tlBicim.format(degisimler[n.x.round()]!.round())}'
+                            ' TL',
+                        style: MT.fiyat(
+                            size: 11,
+                            weight: FontWeight.w700,
+                            color: degisimler[n.x.round()]! > 0
+                                ? MT.yesil
+                                : MT.kirmizi),
+                      ),
                   ],
                 ),
             ],
@@ -342,17 +375,21 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
             isStrokeCapRound: true,
             dotData: FlDotData(
               show: true,
-              // Yalnızca en düşük, en yüksek ve son nokta işaretlenir
+              // Fiyatın değiştiği günler ve son gün işaretlenir
               checkToShowDot: (s, bar) =>
-                  s.y == mn || s.y == mx || s.x == (d.length - 1).toDouble(),
-              getDotPainter: (s, __, ___, ____) => FlDotCirclePainter(
-                radius: s.x == (d.length - 1).toDouble() ? 3.6 : 2.8,
-                color: s.y == mx
-                    ? MT.yesil
-                    : (s.y == mn ? MT.kirmizi : MT.altin),
-                strokeWidth: 1.6,
-                strokeColor: const Color(0xFF171D2E),
-              ),
+                  degisimler.containsKey(s.x.round()) || s.x == sonIndeks,
+              getDotPainter: (s, __, ___, ____) {
+                final fark = degisimler[s.x.round()];
+                final renk = fark == null
+                    ? MT.altin
+                    : (fark > 0 ? MT.yesil : MT.kirmizi);
+                return FlDotCirclePainter(
+                  radius: s.x == sonIndeks ? 4.2 : 3.4,
+                  color: renk,
+                  strokeWidth: 1.8,
+                  strokeColor: const Color(0xFF171D2E),
+                );
+              },
             ),
             belowBarData: BarAreaData(
               show: true,
@@ -369,8 +406,29 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
     );
   }
 
-  /// Son fiyat değişimi: yükseliş yeşil ▲, düşüş kırmızı ▼
+  /// Son fiyat değişimi: yükseliş yeşil ▲, düşüş kırmızı ▼.
+  /// Fiyat hiç değişmediyse (fark 0) soluk "sabit" rozeti gösterilir —
+  /// her kalitenin durumu görünsün, boş kalan satır olmasın.
   Widget _degisimRozeti(num fark) {
+    if (fark == 0) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(7, 3, 8, 3),
+        decoration: BoxDecoration(
+          color: MT.bg,
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(color: MT.cizgi),
+        ),
+        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.remove_rounded, size: 11.5, color: MT.soluk),
+          SizedBox(width: 3),
+          Text('sabit',
+              style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: MT.soluk)),
+        ]),
+      );
+    }
     final artis = fark > 0;
     final renk = artis ? MT.yesil : MT.kirmizi;
     return Container(
@@ -384,7 +442,7 @@ class _FactoryDetailScreenState extends State<FactoryDetailScreen> {
         Icon(artis ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
             size: 11.5, color: renk),
         const SizedBox(width: 2),
-        Text(tlBicim.format(fark.abs()),
+        Text('${artis ? '+' : '−'}${tlBicim.format(fark.abs())} TL',
             style: MT.fiyat(size: 11, weight: FontWeight.w700, color: renk)),
       ]),
     );
