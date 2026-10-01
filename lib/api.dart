@@ -100,15 +100,16 @@ class Api {
 
         final gorselEl = o.findElements('enclosure');
         final link = metin('link');
+        final gorsel =
+            gorselEl.isEmpty ? null : gorselEl.first.getAttribute('url');
         liste.add({
           'baslik': metin('title'),
           'ozet': metin('description'),
           'link': link,
           'kategori': metin('category'),
           'tarih': _rssTarih(metin('pubDate')),
-          'gorsel': gorselEl.isEmpty
-              ? null
-              : gorselEl.first.getAttribute('url'),
+          'gorsel': gorsel,
+          'kaynak': _akisKaynak(gorsel),
           // Haber MTEX'e aitse (kendi sitemizdeki haber sayfası) uygulama
           // içinde tam metin açılabilsin diye id çıkarılır.
           'id': _mtexHaberId(link),
@@ -122,6 +123,14 @@ class Api {
     } catch (_) {
       return _akisCache ?? [];
     }
+  }
+
+  /// RSS'te kaynak alanı yok; görsel yolundan çıkarılır. Lisanslı ajans
+  /// içeriğinde künye zorunlu olduğu için kart ve okuma ekranında gösterilir.
+  static String _akisKaynak(String? gorsel) {
+    final g = gorsel ?? '';
+    if (g.contains('/haber/aa/')) return 'Anadolu Ajansı';
+    return 'MTEX';
   }
 
   /// Bağlantı MTEX'in kendi haber sayfasıysa haber id'sini döndürür
@@ -333,4 +342,48 @@ class Api {
 
   static Future<Map<String, dynamic>> bildirimAyar(bool acik) =>
       _gonder('notify', {'acik': acik}, metot: 'PUT');
+
+  // ---------- Mağaza sürümü ----------
+  static const appStoreUrl =
+      'https://apps.apple.com/tr/app/mtex-hurda/id6797546984';
+  static const playStoreUrl =
+      'https://play.google.com/store/apps/details?id=io.metalexchange.mtex';
+
+  /// Mağazadaki yayında olan sürüm: {'surum': '1.0.2', 'url': '…'}.
+  /// Önce sunucudaki sürüm ucu denenir (iki platform tek yerden yönetilsin),
+  /// yoksa iOS'ta App Store'un kendi sorgusuna düşülür. Play'in herkese açık
+  /// sürüm API'si olmadığından Android'de sunucu ucu şart.
+  /// Bulunamazsa null döner — uygulama sessizce devam eder.
+  static Future<Map<String, String>?> magazaSurumu(String platform) async {
+    try {
+      final j = await _al('app/version?platform=$platform');
+      final s = (j['surum'] ?? j['version'] ?? '').toString();
+      if (j['ok'] == true && s.isNotEmpty) {
+        final u = (j['url'] ?? '').toString();
+        return {'surum': s, 'url': u.isEmpty ? _magazaUrl(platform) : u};
+      }
+    } catch (_) {}
+
+    if (platform != 'ios') return null;
+    try {
+      final r = await http
+          .get(Uri.parse('https://itunes.apple.com/lookup'
+              '?bundleId=io.metalexchange.mtex&country=tr'))
+          .timeout(const Duration(seconds: 15));
+      final j = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
+      final sonuc = (j['results'] as List?) ?? const [];
+      if (sonuc.isEmpty) return null;
+      final ilk = (sonuc.first as Map).cast<String, dynamic>();
+      final s = (ilk['version'] ?? '').toString();
+      if (s.isEmpty) return null;
+      return {
+        'surum': s,
+        'url': (ilk['trackViewUrl'] ?? appStoreUrl).toString(),
+      };
+    } catch (_) {}
+    return null;
+  }
+
+  static String _magazaUrl(String platform) =>
+      platform == 'ios' ? appStoreUrl : playStoreUrl;
 }

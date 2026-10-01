@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -10,6 +10,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'api.dart';
 import 'firebase_options.dart';
+import 'surum.dart';
 import 'models.dart';
 import 'screens/factory_detail.dart';
 import 'theme.dart';
@@ -22,10 +23,26 @@ import 'screens/profile.dart';
 final yerelBildirim = FlutterLocalNotificationsPlugin();
 final navigatorKey = GlobalKey<NavigatorState>();
 
-/// Bildirime tıklanınca ilgili fabrikanın detay sayfasını açar.
-/// Beklenen data: {tur: fiyat_guncelleme, fabrika_id, fabrika_ad, kalite_id}
+/// Bildirimle istenen alt sekme (-1 = istek yok). Ana iskelet dinler.
+final sekmeIstegi = ValueNotifier<int>(-1);
+
+/// Bildirime tıklanınca ilgili ekranı açar. Beklenen `tur` değerleri:
+///  • fiyat_guncelleme → fabrika detayı (fabrika_id, kalite_id)
+///  • ithal_hurda      → Piyasa sekmesi (yurt dışı hurda / parite kartı)
+///  • guncelleme       → mağazadaki uygulama sayfası
 void _bildirimYonlendir(Map<String, dynamic> data) {
-  if (data['tur'] != 'fiyat_guncelleme') return;
+  final tur = (data['tur'] ?? '').toString();
+
+  if (tur == 'guncelleme') {
+    SurumKontrol.magazayiAc((data['url'] ?? '').toString());
+    return;
+  }
+  if (tur == 'ithal_hurda') {
+    sekmeIstegi.value = 1; // Piyasa
+    return;
+  }
+
+  if (tur != 'fiyat_guncelleme') return;
   final fabrikaId = int.tryParse((data['fabrika_id'] ?? '').toString());
   if (fabrikaId == null) return;
   final kaliteId = int.tryParse((data['kalite_id'] ?? '').toString());
@@ -66,7 +83,11 @@ Future<void> main() async {
   // (Firebase beklenirse ve takılırsa uygulama açılış ekranında kalıyordu.)
   runApp(const MtexApp());
 
-  if (_mobilPlatform) unawaited(_firebaseBaslat());
+  if (_mobilPlatform) {
+    unawaited(_firebaseBaslat());
+    // Arayüz oturduktan sonra mağazadaki sürüme bakılır
+    unawaited(Future.delayed(const Duration(seconds: 3), SurumKontrol.kontrolEt));
+  }
 }
 
 Future<void> _firebaseBaslat() async {
@@ -90,14 +111,28 @@ Future<void> _bildirimKur() async {
   await fm.setForegroundNotificationPresentationOptions(
       alert: true, badge: true, sound: true);
 
-  const kanal = AndroidNotificationChannel(
-    'fiyat', 'Fiyat Güncellemeleri',
-    description: 'Fabrikalar fiyat güncellediğinde bildirim',
-    importance: Importance.high,
-  );
-  await yerelBildirim
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(kanal);
+  const kanallar = [
+    AndroidNotificationChannel(
+      'fiyat', 'Fiyat Güncellemeleri',
+      description: 'Fabrikalar fiyat güncellediğinde bildirim',
+      importance: Importance.high,
+    ),
+    AndroidNotificationChannel(
+      'ithal', 'İthal Hurda Fiyatı',
+      description: 'Yurt dışı hurda fiyatı değiştiğinde bildirim',
+      importance: Importance.high,
+    ),
+    AndroidNotificationChannel(
+      'guncelleme', 'Uygulama Güncellemeleri',
+      description: 'Yeni sürüm yayınlandığında bildirim',
+      importance: Importance.defaultImportance,
+    ),
+  ];
+  final androidBildirim = yerelBildirim.resolvePlatformSpecificImplementation<
+      AndroidFlutterLocalNotificationsPlugin>();
+  for (final k in kanallar) {
+    await androidBildirim?.createNotificationChannel(k);
+  }
 
   await yerelBildirim.initialize(
     settings: const InitializationSettings(
@@ -120,15 +155,22 @@ Future<void> _bildirimKur() async {
     final n = m.notification;
     if (n == null) return;
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      // Metin sunucudan geldiği gibi gösterilir; uygulama ekleme yapmaz.
+      final tur = (m.data['tur'] ?? '').toString();
+      final kanal = tur == 'ithal_hurda'
+          ? ('ithal', 'İthal Hurda Fiyatı')
+          : tur == 'guncelleme'
+              ? ('guncelleme', 'Uygulama Güncellemeleri')
+              : ('fiyat', 'Fiyat Güncellemeleri');
       yerelBildirim.show(
         id: n.hashCode,
         title: n.title,
         body: n.body,
         payload: jsonEncode(m.data),
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails('fiyat', 'Fiyat Güncellemeleri',
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(kanal.$1, kanal.$2,
               importance: Importance.high, priority: Priority.high),
-          iOS: DarwinNotificationDetails(),
+          iOS: const DarwinNotificationDetails(),
         ),
       );
     }
@@ -156,20 +198,25 @@ Future<void> _bildirimKur() async {
     }
   }
 
-  // Herkese yayın bildirimleri için konu aboneliği (giriş gerektirmez):
-  // sunucu "fiyat" konusuna tek gönderimle tüm cihazlara ulaşır.
-  // İlk deneme tutmazsa 10 sn sonra bir kez daha dene.
-  try {
-    await fm.subscribeToTopic('fiyat');
-    debugPrint('MTEX topic aboneligi: BASARILI (fiyat)');
-  } catch (e) {
-    debugPrint('MTEX topic aboneligi ilk deneme hatasi: $e');
-    await Future.delayed(const Duration(seconds: 10));
+  // Herkese yayın bildirimleri için konu abonelikleri (giriş gerektirmez):
+  //   fiyat  → fabrika fiyat güncellemeleri
+  //   ithal  → yurt dışı/ithal hurda fiyatı değişimi
+  //   surum  → yeni uygulama sürümü duyurusu
+  // Sunucu ilgili konuya tek gönderimle tüm cihazlara ulaşır.
+  // İlk deneme tutmazsa 10 sn sonra bir kez daha denenir.
+  for (final konu in ['fiyat', 'ithal', 'surum']) {
     try {
-      await fm.subscribeToTopic('fiyat');
-      debugPrint('MTEX topic aboneligi: BASARILI (2. deneme)');
-    } catch (e2) {
-      debugPrint('MTEX topic aboneligi: BASARISIZ ($e2)');
+      await fm.subscribeToTopic(konu);
+      debugPrint('MTEX topic aboneligi: BASARILI ($konu)');
+    } catch (e) {
+      debugPrint('MTEX topic aboneligi ilk deneme hatasi ($konu): $e');
+      await Future.delayed(const Duration(seconds: 10));
+      try {
+        await fm.subscribeToTopic(konu);
+        debugPrint('MTEX topic aboneligi: BASARILI ($konu, 2. deneme)');
+      } catch (e2) {
+        debugPrint('MTEX topic aboneligi: BASARISIZ ($konu: $e2)');
+      }
     }
   }
 
@@ -241,6 +288,7 @@ class _AnaIskeletState extends State<AnaIskelet> {
   @override
   void initState() {
     super.initState();
+    sekmeIstegi.addListener(_sekmeIstegiGeldi);
     // Ekran görüntüsü üretimi: --dart-define=FABRIKA=10 verilirse açılışta
     // o fabrikanın detayı açılır (varsayılan 0 = kapalı, yayında etkisiz).
     const fabrikaId = int.fromEnvironment('FABRIKA', defaultValue: 0);
@@ -254,6 +302,22 @@ class _AnaIskeletState extends State<AnaIskelet> {
         ));
       });
     }
+  }
+
+  /// Bildirim bir sekme istediyse üstteki sayfaları kapatıp oraya geçer.
+  void _sekmeIstegiGeldi() {
+    final i = sekmeIstegi.value;
+    if (i < 0 || i >= _ekranlar.length) return;
+    sekmeIstegi.value = -1;
+    if (!mounted) return;
+    navigatorKey.currentState?.popUntil((r) => r.isFirst);
+    setState(() => _sekme = i);
+  }
+
+  @override
+  void dispose() {
+    sekmeIstegi.removeListener(_sekmeIstegiGeldi);
+    super.dispose();
   }
 
   @override

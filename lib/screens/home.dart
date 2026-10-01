@@ -5,9 +5,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../widgets/haber_karti.dart';
 import '../widgets/son_dakika.dart';
 import 'factory_detail.dart';
-import 'news_detail.dart';
+import 'news.dart';
 
 final tlBicim = NumberFormat.decimalPattern('tr_TR');
 
@@ -24,7 +25,6 @@ class _HomeScreenState extends State<HomeScreen> {
   String _arama = '';
   Set<int> _favoriler = {};
   final _aramaDenetleyici = TextEditingController();
-  final _haberSayfa = PageController(viewportFraction: .97);
   List<Map<String, dynamic>> _haberler = [];
   List<String> _sonDakika = [];
 
@@ -74,7 +74,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _aramaDenetleyici.dispose();
-    _haberSayfa.dispose();
     super.dispose();
   }
 
@@ -231,9 +230,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Site ana sayfasıyla aynı düzen: kaydırmalı manşetler (20 haber)
+  /// Site haber bölümüyle aynı düzen: en üstte öne çıkan haber kartı,
+  /// altında kompakt satırlar, en altta tüm haberler bağlantısı.
   Widget _haberSeridi() {
-    final mansetler = _haberler.take(20).toList();
+    final oneCikan = _haberler.first;
+    final digerleri = _haberler.skip(1).take(4).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
         padding: const EdgeInsets.only(left: 2, bottom: 10),
@@ -246,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
           const Spacer(),
           InkWell(
-            onTap: () => _haberAc('https://metalexchange.io/#haberler'),
+            onTap: _tumHaberler,
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Text('tüm haberler →',
@@ -255,128 +256,34 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ]),
       ),
+      HaberKarti(haber: oneCikan),
+      for (final h in digerleri) ...[
+        const SizedBox(height: 9),
+        HaberKarti(haber: h, kompakt: true),
+      ],
+      const SizedBox(height: 10),
       SizedBox(
-        height: 236,
-        child: PageView.builder(
-          controller: _haberSayfa,
-          itemCount: mansetler.length,
-          itemBuilder: (_, i) =>
-              _mansetKarti(mansetler[i], i + 1, mansetler.length),
+        width: double.infinity,
+        child: OutlinedButton(
+          onPressed: _tumHaberler,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: MT.altin,
+            side: const BorderSide(color: MT.cizgi),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(11)),
+          ),
+          child: Text('Tüm haberler (${_haberler.length})',
+              style: const TextStyle(
+                  fontSize: 13.5, fontWeight: FontWeight.w700)),
         ),
       ),
     ]);
   }
 
-  Widget _mansetKarti(Map<String, dynamic> h, int sira, int toplam) {
-    final gorsel = h['gorsel'] as String?;
-    return Padding(
-      padding: const EdgeInsets.only(right: 2),
-      child: Card(
-        margin: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => _habereGit(h),
-          child: Stack(fit: StackFit.expand, children: [
-            if (gorsel != null && gorsel.isNotEmpty)
-              Image.network(gorsel, fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _haberGorselYok())
-            else
-              _haberGorselYok(),
-            // Yazıların okunabilmesi için koyu geçiş
-            Container(decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                colors: [Color(0x22000000), Color(0xCC0B0F18), Color(0xF2080B12)],
-                stops: [0, .48, 1],
-              ),
-            )),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(15, 14, 15, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text((h['baslik'] ?? '').toString(),
-                      maxLines: 3, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 17.5,
-                          fontWeight: FontWeight.w800, height: 1.25,
-                          color: Colors.white)),
-                  const SizedBox(height: 7),
-                  Text((h['ozet'] ?? '').toString(),
-                      maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12.5,
-                          height: 1.42, color: Color(0xFFB9C2D0))),
-                  const SizedBox(height: 11),
-                  Row(children: [
-                    Text(_zamanFarki(h['tarih'] as DateTime?),
-                        style: const TextStyle(fontSize: 11.5, color: MT.soluk)),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 9, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .10),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text('$sira / $toplam',
-                          style: MT.fiyat(size: 10.5,
-                              weight: FontWeight.w700, color: Colors.white)),
-                    ),
-                  ]),
-                ],
-              ),
-            ),
-          ]),
-        ),
-      ),
-    );
-  }
+  void _tumHaberler() => Navigator.push(
+      context, MaterialPageRoute(builder: (_) => const NewsScreen()));
 
-
-
-  Widget _haberGorselYok() => Container(
-        color: const Color(0xFF1E2839),
-        alignment: Alignment.center,
-        child: const Icon(Icons.newspaper_rounded, size: 30, color: MT.soluk),
-      );
-
-  String _zamanFarki(DateTime? t) {
-    if (t == null) return '';
-    final d = DateTime.now().difference(t);
-    if (d.inMinutes < 60) return '${d.inMinutes} dk önce';
-    if (d.inHours < 24) return '${d.inHours} saat önce';
-    if (d.inDays < 7) return '${d.inDays} gün önce';
-    return DateFormat('dd.MM.yyyy').format(t);
-  }
-
-  /// MTEX haberi → uygulama içi tam metin okuyucu (yönlendirme yok).
-  /// Dış kaynaklı haber → uygulama içi tarayıcı görünümü.
-  void _habereGit(Map<String, dynamic> h) {
-    if (h['id'] != null) {
-      Navigator.push(context, MaterialPageRoute(
-        builder: (_) => NewsDetailScreen(
-          id: h['id'] as int,
-          baslik: (h['baslik'] ?? '').toString(),
-          gorsel: h['gorsel'] as String?,
-        ),
-      ));
-    } else {
-      _haberAc((h['link'] ?? '').toString());
-    }
-  }
-
-  /// Dış bağlantı uygulamadan çıkmadan açılır (iOS: Safari görünümü,
-  /// Android: Custom Tab). Kapatınca kullanıcı MTEX'te kaldığı yerde devam eder.
-  Future<void> _haberAc(String url) async {
-    if (url.isEmpty) return;
-    try {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.inAppBrowserView);
-    } catch (_) {
-      try {
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      } catch (_) {}
-    }
-  }
 
   Future<void> _whatsapp() async {
     final uri = Uri.parse('https://wa.me/905308632022');

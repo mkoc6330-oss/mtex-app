@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../theme.dart';
+import '../widgets/haber_karti.dart' show haberGorselAdresi;
 
 /// MTEX'in kendi haberini uygulama içinde tam metin gösterir.
 /// (İçerik MTEX'e ait olduğu için yönlendirme yapılmaz.)
@@ -86,10 +87,11 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                   padding: EdgeInsets.zero,
                   children: [
                     if (gorsel.isNotEmpty)
-                      Image.network(gorsel,
+                      Image.network(haberGorselAdresi(gorsel),
                           height: 190, width: double.infinity,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                          errorBuilder: (_, __, ___) =>
+                              const SizedBox.shrink()),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 18, 16, 30),
                       child: Column(
@@ -196,8 +198,14 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                           const SizedBox(height: 22),
                           const Divider(color: MT.cizgi),
                           const SizedBox(height: 10),
-                          const Text('MTEX · metalexchange.io',
-                              style: TextStyle(fontSize: 11.5, color: MT.soluk)),
+                          // Lisanslı ajans içeriğinde künye zorunlu
+                          Text(
+                              kaynak.toLowerCase() == 'mtex'
+                                  ? 'MTEX · metalexchange.io'
+                                  : 'Kaynak: $kaynak · MTEX '
+                                      'metalexchange.io',
+                              style: const TextStyle(
+                                  fontSize: 11.5, color: MT.soluk)),
                         ],
                       ),
                     ),
