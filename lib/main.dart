@@ -26,9 +26,9 @@ final navigatorKey = GlobalKey<NavigatorState>();
 
 /// Alt menü sırası — bildirim ve kısayollar bu sabitleri kullanır
 const sekmeFabrikalar = 0;
-const sekmePiyasa = 1;
-const sekmeHesapla = 2;
-const sekmeHaberler = 3;
+const sekmeHaberler = 1;
+const sekmePiyasa = 2;
+const sekmeHesapla = 3;
 const sekmeAnaliz = 4;
 const sekmeProfil = 5;
 
@@ -288,9 +288,9 @@ class _AnaIskeletState extends State<AnaIskelet> {
 
   final _ekranlar = const [
     HomeScreen(),
+    NewsScreen(),
     MarketScreen(),
     CalculatorScreen(),
-    NewsScreen(),
     ArticlesScreen(),
     ProfileScreen(),
   ];
@@ -361,6 +361,10 @@ class _AnaIskeletState extends State<AnaIskelet> {
                     selectedIcon: Icon(Icons.factory, color: MT.turuncu),
                     label: 'Fabrikalar'),
                 NavigationDestination(
+                    icon: Icon(Icons.newspaper_outlined),
+                    selectedIcon: Icon(Icons.newspaper, color: MT.turuncu),
+                    label: 'Haberler'),
+                NavigationDestination(
                     icon: Icon(Icons.show_chart_outlined),
                     selectedIcon: Icon(Icons.show_chart, color: MT.turuncu),
                     label: 'Piyasa'),
@@ -368,10 +372,6 @@ class _AnaIskeletState extends State<AnaIskelet> {
                     icon: Icon(Icons.calculate_outlined),
                     selectedIcon: Icon(Icons.calculate, color: MT.turuncu),
                     label: 'Hesapla'),
-                NavigationDestination(
-                    icon: Icon(Icons.newspaper_outlined),
-                    selectedIcon: Icon(Icons.newspaper, color: MT.turuncu),
-                    label: 'Haberler'),
                 NavigationDestination(
                     icon: Icon(Icons.article_outlined),
                     selectedIcon: Icon(Icons.article, color: MT.turuncu),
