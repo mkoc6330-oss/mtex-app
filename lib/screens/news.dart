@@ -3,8 +3,8 @@ import '../api.dart';
 import '../theme.dart';
 import '../widgets/haber_karti.dart';
 
-/// Sitedeki "Ekonomi Haberleri" sayfasının uygulama karşılığı:
-/// kaynak süzgeci, arama ve site düzeniyle aynı haber kartları.
+/// Sitedeki haber bölümünün uygulama karşılığı: bölüm süzgeci (hurda &
+/// metal, finans, enerji…), arama ve site düzeniyle aynı haber kartları.
 class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key});
   @override
@@ -15,7 +15,7 @@ class _NewsScreenState extends State<NewsScreen> {
   List<Map<String, dynamic>> _haberler = [];
   bool _yukleniyor = true;
   String _arama = '';
-  String _kaynak = 'Tümü';
+  String _bolum = 'Tümü';
   final _aramaDenetleyici = TextEditingController();
 
   @override
@@ -39,21 +39,24 @@ class _NewsScreenState extends State<NewsScreen> {
     if (mounted) setState(() => _yukleniyor = false);
   }
 
-  List<String> get _kaynaklar {
-    final s = <String>{};
-    for (final h in _haberler) {
-      s.add((h['kaynak'] ?? 'MTEX').toString());
-    }
-    return ['Tümü', ...s];
+  /// Yalnızca haberi olan bölümler gösterilir; sıra api.dart'taki
+  /// bölüm sırasıyla aynıdır (en alakalı başta, Gündem sonda).
+  List<String> get _bolumler {
+    const sira = [
+      'Hurda & Metal', 'Finans', 'Enerji', 'Şirketler', 'Tarım & Gıda',
+      'Gündem',
+    ];
+    final mevcut = _haberler.map((h) => _haberBolum(h)).toSet();
+    return ['Tümü', ...sira.where(mevcut.contains)];
   }
+
+  static String _haberBolum(Map<String, dynamic> h) =>
+      (h['bolum'] ?? 'Gündem').toString();
 
   List<Map<String, dynamic>> get _suzgecli {
     final a = _arama.toLowerCase().trim();
     return _haberler.where((h) {
-      if (_kaynak != 'Tümü' &&
-          (h['kaynak'] ?? 'MTEX').toString() != _kaynak) {
-        return false;
-      }
+      if (_bolum != 'Tümü' && _haberBolum(h) != _bolum) return false;
       if (a.isEmpty) return true;
       final metin =
           '${h['baslik'] ?? ''} ${h['ozet'] ?? ''}'.toLowerCase();
@@ -65,7 +68,7 @@ class _NewsScreenState extends State<NewsScreen> {
   Widget build(BuildContext c) {
     final liste = _suzgecli;
     return Scaffold(
-      appBar: AppBar(title: const Text('Ekonomi Haberleri')),
+      appBar: AppBar(title: const Text('Haberler')),
       body: _yukleniyor
           ? const Center(child: CircularProgressIndicator(color: MT.altin))
           : RefreshIndicator(
@@ -76,8 +79,8 @@ class _NewsScreenState extends State<NewsScreen> {
                 padding: const EdgeInsets.fromLTRB(14, 4, 14, 26),
                 children: [
                   const Text(
-                      'Anadolu Ajansı ekonomi haberleri — hurda ve metal '
-                      'fiyatları için Fabrikalar sekmesi',
+                      'Hurda & metal, finans, enerji ve piyasa haberleri '
+                      '— Anadolu Ajansı',
                       style: TextStyle(
                           fontSize: 12.5, color: MT.soluk, height: 1.45)),
                   const SizedBox(height: 13),
@@ -107,7 +110,7 @@ class _NewsScreenState extends State<NewsScreen> {
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(children: [
-                      for (final k in _kaynaklar) ...[
+                      for (final k in _bolumler) ...[
                         _cip(k),
                         const SizedBox(width: 8),
                       ],
@@ -132,13 +135,13 @@ class _NewsScreenState extends State<NewsScreen> {
   }
 
   Widget _cip(String ad) {
-    final secili = _kaynak == ad;
+    final secili = _bolum == ad;
     final adet = ad == 'Tümü'
         ? _haberler.length
-        : _haberler.where((h) => (h['kaynak'] ?? 'MTEX') == ad).length;
+        : _haberler.where((h) => _haberBolum(h) == ad).length;
     return InkWell(
       borderRadius: BorderRadius.circular(20),
-      onTap: () => setState(() => _kaynak = ad),
+      onTap: () => setState(() => _bolum = ad),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(

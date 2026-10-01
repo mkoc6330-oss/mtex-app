@@ -95,3 +95,24 @@ sürümünde görseller yüklenemiyor. cPanel'de `/uploads/.htaccess`:
   Header set Access-Control-Allow-Origin "*"
 </IfModule>
 ```
+
+---
+
+## 4) Haber akışına kategori alanı (orta vadeli)
+
+`news_live.php` şu anda 30 haberin tamamını tek kategoriyle (`piyasa`)
+gönderiyor. Uygulama bölümleri (Hurda & Metal, Finans, Enerji, Şirketler,
+Tarım & Gıda, Gündem) başlık/özet üzerinden kendi çıkarıyor — çalışıyor
+ama kaynakta kategori olursa çok daha isabetli olur.
+
+Beslemede `<category>` alanı gerçek kategoriyle doldurulursa veya
+`?cat=` parametresi desteklenirse uygulama doğrudan onu kullanır.
+
+Not: `?cat=` ve `?kategori=` parametreleri şu an sessizce yok sayılıyor,
+her durumda aynı 30 kayıt dönüyor.
+
+Ayrıca sitenin ana sayfasındaki **"Hurda & LME haberleri"**, **"Emtia
+haberleri"** ve **"Finans & kripto haberleri"** blokları hâlâ sayfa
+içine gömülü sabit örnek veriyle çalışıyor (26.06 / 29.06 tarihli,
+"MTEX AI" ve "BloombergHT" imzalı uydurma kayıtlar). Canlı akışa
+bağlanmaları gerekiyor — uygulamada bu bölümler gerçek veriyle çalışıyor.

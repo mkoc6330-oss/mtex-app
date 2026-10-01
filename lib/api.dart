@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xml/xml.dart';
@@ -110,6 +111,7 @@ class Api {
           'tarih': _rssTarih(metin('pubDate')),
           'gorsel': gorsel,
           'kaynak': _akisKaynak(gorsel),
+          'bolum': _haberBolumu(metin('title'), metin('description')),
           // Haber MTEX'e aitse (kendi sitemizdeki haber sayfası) uygulama
           // içinde tam metin açılabilsin diye id çıkarılır.
           'id': _mtexHaberId(link),
@@ -123,6 +125,49 @@ class Api {
     } catch (_) {
       return _akisCache ?? [];
     }
+  }
+
+  /// Sitedeki haber bölümleri (hurda & metal, finans, enerji…). Akış tek
+  /// kategoriyle ("piyasa") geldiği için ayrım başlık ve özetten çıkarılır.
+  /// Sıra önemlidir: ilk eşleşen bölüm kazanır, en alakalı en üstte.
+  static final _bolumKurallari = <(String, RegExp)>[
+    ('Hurda & Metal', RegExp(
+        r'hurda|çelik|metal|maden|alüminyum|bakır|demir|alaşım|döküm|'
+        r'ferro|nikel|çinko|kurşun|paslanmaz|haddehane|ingot|'
+        r'kütük|filmaşin|\blme\b|\bslab\b',
+        caseSensitive: false)),
+    ('Enerji', RegExp(
+        r'petrol|doğal ?gaz|enerji|elektrik|akaryakıt|benzin|motorin|epdk|'
+        r'yenilenebilir|güneş enerjisi|rüzgar|kömür|brent|varil|\blng\b',
+        caseSensitive: false)),
+    // Kısa kalıplar sınırlandırıldı: sınırsız "ons" sponsor/konsorsiyum,
+    // "fon" ise fonksiyon gibi kelimelerin içinde eşleşiyordu.
+    ('Finans', RegExp(
+        r'borsa|faiz|merkez bankası|dolar|euro|döviz|kripto|bitcoin|'
+        r'banka|tahvil|hisse|enflasyon|kredi|bütçe|vergi|altın|gümüş|'
+        r'yatırım fonu|fonlar|kurlar|\bbist\b|\bspk\b|\bons\b|'
+        r'\btüfe\b|\büfe\b',
+        caseSensitive: false)),
+    ('Tarım & Gıda', RegExp(
+        r'tarım|buğday|pamuk|hububat|çiftçi|hasat|gıda|tohum|hayvancılık|'
+        r'süt|arıcılık|zeytin|fındık|meyve|sebze|orman|\bbal\b',
+        caseSensitive: false)),
+    ('Şirketler', RegExp(
+        r'a\.ş|anonim şirket|holding|ihracat sözleşmesi|şirketi|'
+        r'yatırım yapacak|imzaladı|satın aldı|halka arz',
+        caseSensitive: false)),
+  ];
+
+  @visibleForTesting
+  static String haberBolumu(String baslik, String ozet) =>
+      _haberBolumu(baslik, ozet);
+
+  static String _haberBolumu(String baslik, String ozet) {
+    final metin = '$baslik $ozet';
+    for (final (ad, kural) in _bolumKurallari) {
+      if (kural.hasMatch(metin)) return ad;
+    }
+    return 'Gündem';
   }
 
   /// RSS'te kaynak alanı yok; görsel yolundan çıkarılır. Lisanslı ajans
