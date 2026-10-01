@@ -18,10 +18,19 @@ import 'screens/home.dart';
 import 'screens/market.dart';
 import 'screens/calculator.dart';
 import 'screens/articles.dart';
+import 'screens/news.dart';
 import 'screens/profile.dart';
 
 final yerelBildirim = FlutterLocalNotificationsPlugin();
 final navigatorKey = GlobalKey<NavigatorState>();
+
+/// Alt menü sırası — bildirim ve kısayollar bu sabitleri kullanır
+const sekmeFabrikalar = 0;
+const sekmePiyasa = 1;
+const sekmeHesapla = 2;
+const sekmeHaberler = 3;
+const sekmeAnaliz = 4;
+const sekmeProfil = 5;
 
 /// Bildirimle istenen alt sekme (-1 = istek yok). Ana iskelet dinler.
 final sekmeIstegi = ValueNotifier<int>(-1);
@@ -38,7 +47,7 @@ void _bildirimYonlendir(Map<String, dynamic> data) {
     return;
   }
   if (tur == 'ithal_hurda') {
-    sekmeIstegi.value = 1; // Piyasa
+    sekmeIstegi.value = sekmePiyasa;
     return;
   }
 
@@ -281,6 +290,7 @@ class _AnaIskeletState extends State<AnaIskelet> {
     HomeScreen(),
     MarketScreen(),
     CalculatorScreen(),
+    NewsScreen(),
     ArticlesScreen(),
     ProfileScreen(),
   ];
@@ -333,7 +343,12 @@ class _AnaIskeletState extends State<AnaIskelet> {
               backgroundColor: MT.kart,
               indicatorColor: MT.turuncu.withValues(alpha: 0.18),
               labelTextStyle: WidgetStateProperty.all(
-                const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                // Alti sekme 320pt'ye (en dar iPhone) sigar; cihazda yazi
+                // buyutulurse etiket tasmak yerine kisalir.
+                const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    overflow: TextOverflow.ellipsis),
               ),
             ),
             child: NavigationBar(
@@ -353,6 +368,10 @@ class _AnaIskeletState extends State<AnaIskelet> {
                     icon: Icon(Icons.calculate_outlined),
                     selectedIcon: Icon(Icons.calculate, color: MT.turuncu),
                     label: 'Hesapla'),
+                NavigationDestination(
+                    icon: Icon(Icons.newspaper_outlined),
+                    selectedIcon: Icon(Icons.newspaper, color: MT.turuncu),
+                    label: 'Haberler'),
                 NavigationDestination(
                     icon: Icon(Icons.article_outlined),
                     selectedIcon: Icon(Icons.article, color: MT.turuncu),

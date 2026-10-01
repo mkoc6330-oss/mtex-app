@@ -5,10 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
-import '../widgets/haber_karti.dart';
 import '../widgets/son_dakika.dart';
 import 'factory_detail.dart';
-import 'news.dart';
 
 final tlBicim = NumberFormat.decimalPattern('tr_TR');
 
@@ -25,7 +23,6 @@ class _HomeScreenState extends State<HomeScreen> {
   String _arama = '';
   Set<int> _favoriler = {};
   final _aramaDenetleyici = TextEditingController();
-  List<Map<String, dynamic>> _haberler = [];
   List<String> _sonDakika = [];
 
   @override
@@ -33,18 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _favorileriYukle();
     _yukle();
-    _haberleriYukle();
-  }
-
-  /// Ana ekran manşetleri: sitenin ana sayfasındaki genel piyasa/ekonomi akışı.
-  /// (MTEX'in kendi analiz ve fabrika haberleri Analiz sekmesinde.)
-  /// Kayıtta `id` varsa haber MTEX'e aittir → uygulama içinde tam metin açılır;
-  /// yoksa kaynak sitede uygulama içi tarayıcıyla gösterilir.
-  Future<void> _haberleriYukle({bool yenile = false}) async {
-    try {
-      final h = await Api.canliHaberler(yenile: yenile);
-      if (mounted) setState(() => _haberler = h);
-    } catch (_) {}
     _sonDakikaYukle();
   }
 
@@ -148,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: MT.kart,
         onRefresh: () async {
           await Future.wait(
-              [_yukle(yenile: true), _haberleriYukle(yenile: true)]);
+              [_yukle(yenile: true), _sonDakikaYukle()]);
         },
         child: _yukleniyor && _fab.isEmpty
             ? const Center(child: CircularProgressIndicator(color: MT.turuncu))
@@ -199,10 +184,6 @@ class _HomeScreenState extends State<HomeScreen> {
           SonDakikaSeridi(maddeler: _sonDakika),
           const SizedBox(height: 14),
         ],
-        if (_haberler.isNotEmpty && _arama.isEmpty) ...[
-          _haberSeridi(),
-          const SizedBox(height: 14),
-        ],
         if (favoriListe.isNotEmpty) ...[
           const Padding(
             padding: EdgeInsets.only(left: 4, bottom: 8),
@@ -230,59 +211,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Site haber bölümüyle aynı düzen: en üstte öne çıkan haber kartı,
-  /// altında kompakt satırlar, en altta tüm haberler bağlantısı.
-  Widget _haberSeridi() {
-    final oneCikan = _haberler.first;
-    final digerleri = _haberler.skip(1).take(4).toList();
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(
-        padding: const EdgeInsets.only(left: 2, bottom: 10),
-        child: Row(children: [
-          Container(width: 3.5, height: 17,
-              decoration: BoxDecoration(
-                  color: MT.kirmizi, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(width: 8),
-          const Text('Son haberler',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-          const Spacer(),
-          InkWell(
-            onTap: _tumHaberler,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              child: Text('tüm haberler →',
-                  style: TextStyle(fontSize: 12, color: MT.soluk)),
-            ),
-          ),
-        ]),
-      ),
-      HaberKarti(haber: oneCikan),
-      for (final h in digerleri) ...[
-        const SizedBox(height: 9),
-        HaberKarti(haber: h, kompakt: true),
-      ],
-      const SizedBox(height: 10),
-      SizedBox(
-        width: double.infinity,
-        child: OutlinedButton(
-          onPressed: _tumHaberler,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: MT.altin,
-            side: const BorderSide(color: MT.cizgi),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(11)),
-          ),
-          child: Text('Tüm haberler (${_haberler.length})',
-              style: const TextStyle(
-                  fontSize: 13.5, fontWeight: FontWeight.w700)),
-        ),
-      ),
-    ]);
-  }
-
-  void _tumHaberler() => Navigator.push(
-      context, MaterialPageRoute(builder: (_) => const NewsScreen()));
 
 
   Future<void> _whatsapp() async {
