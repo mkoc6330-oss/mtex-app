@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api.dart';
+import '../main.dart' show ithalHurdaBildirimi;
 import '../theme.dart';
 import 'home.dart' show tlBicim;
 
@@ -70,8 +71,16 @@ class _MarketScreenState extends State<MarketScreen>
       final sp = await SharedPreferences.getInstance();
       final onceki = sp.getDouble('ithal_son');
       if (onceki != null && ithal != onceki) {
-        _ithalTrend = ithal > onceki ? 'yukselis' : 'dusus';
+        final artis = ithal > onceki;
+        _ithalTrend = artis ? 'yukselis' : 'dusus';
         await sp.setString('ithal_trend', _ithalTrend!);
+        // Fiyat uygulamaya zaten geldi; bildirimi buradan veriyoruz
+        await ithalHurdaBildirimi(
+          'İthal hurda fiyatı değişti',
+          'İthal hurda ${tlBicim.format(ithal)} \$/ton — '
+              '${tlBicim.format((ithal - onceki).abs())} \$ '
+              '${artis ? 'yükseldi' : 'düştü'}',
+        );
       } else {
         _ithalTrend ??= sp.getString('ithal_trend');
       }

@@ -8,6 +8,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart';
 import 'firebase_options.dart';
 import 'surum.dart';
@@ -75,6 +76,51 @@ void _bildirimYonlendir(Map<String, dynamic> data) {
 Future<void> _arkaPlanMesaji(RemoteMessage m) async {
   await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform);
+  await ithalPushIsaretle(m.data);
+}
+
+const _ithalPushAnahtari = 'ithal_push_zamani';
+const _ithalBildirimId = 90002;
+
+/// Sunucudan ithal hurda bildirimi geldiyse zamanı saklanır. Uygulama
+/// kendi yerel uyarısını göndermez — kullanıcı aynı değişim için iki
+/// bildirim almasın diye.
+Future<void> ithalPushIsaretle(Map<String, dynamic> data) async {
+  if ((data['tur'] ?? '').toString() != 'ithal_hurda') return;
+  try {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setInt(
+        _ithalPushAnahtari, DateTime.now().millisecondsSinceEpoch);
+  } catch (_) {}
+}
+
+/// İthal hurda fiyatı değiştiğinde yerel bildirim.
+///
+/// Fiyat Piyasa verisiyle uygulamaya zaten geldiği için sunucu push'u
+/// beklenmez; değişimi uygulama kendi görür ve tek satır uyarı gösterir.
+/// Sunucu son 12 saatte aynı konuda push gönderdiyse susar.
+/// Not: yerel bildirim yalnızca uygulama çalışırken üretilebilir;
+/// uygulamayı hiç açmayan kullanıcıya ulaşmak için sunucu push'u gerekir.
+Future<void> ithalHurdaBildirimi(String baslik, String govde) async {
+  if (!_mobilPlatform) return;
+  try {
+    final sp = await SharedPreferences.getInstance();
+    final sonPush = sp.getInt(_ithalPushAnahtari) ?? 0;
+    final fark = DateTime.now().millisecondsSinceEpoch - sonPush;
+    if (fark < const Duration(hours: 12).inMilliseconds) return;
+
+    await yerelBildirim.show(
+      id: _ithalBildirimId, // sabit id: yenisi eskisinin yerine geçer
+      title: baslik,
+      body: govde,
+      payload: jsonEncode({'tur': 'ithal_hurda'}),
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails('ithal', 'İthal Hurda Fiyatı',
+            importance: Importance.high, priority: Priority.high),
+        iOS: DarwinNotificationDetails(),
+      ),
+    );
+  } catch (_) {}
 }
 
 /// Firebase yalnızca Android/iOS'ta kullanılır (masaüstü/web önizlemede atlanır)
@@ -161,6 +207,7 @@ Future<void> _bildirimKur() async {
 
   // Uygulama açıkken gelen bildirimi göster (Android; iOS'u sistem gösterir)
   FirebaseMessaging.onMessage.listen((m) {
+    unawaited(ithalPushIsaretle(m.data));
     final n = m.notification;
     if (n == null) return;
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
