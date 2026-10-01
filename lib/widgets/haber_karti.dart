@@ -7,10 +7,17 @@ import '../theme.dart';
 /// Web sitesindeki haber kartının uygulama karşılığı:
 /// üstte 16:9 görsel, altında altın renkli kaynak künyesi, kalın başlık
 /// ve tarih. `kompakt` biçiminde görsel sola alınır (liste satırı).
+/// `kayan` biçiminde kart verilen yüksekliği doldurur — öne çıkanlar
+/// slider'ında kartların boyu başlık uzunluğuna göre oynamasın diye.
 class HaberKarti extends StatelessWidget {
   final Map<String, dynamic> haber;
   final bool kompakt;
-  const HaberKarti({super.key, required this.haber, this.kompakt = false});
+  final bool kayan;
+  const HaberKarti(
+      {super.key,
+      required this.haber,
+      this.kompakt = false,
+      this.kayan = false});
 
   @override
   Widget build(BuildContext c) => Card(
@@ -22,38 +29,48 @@ class HaberKarti extends StatelessWidget {
         ),
       );
 
-  Widget _dikey() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+  Widget _dikey() {
+    final gorsel = ClipRRect(
+      borderRadius: BorderRadius.circular(9),
+      child: haberGorseli(haber['gorsel']),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (kayan)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(9, 9, 9, 0),
+              child: SizedBox(width: double.infinity, child: gorsel),
+            ),
+          )
+        else
           Padding(
             padding: const EdgeInsets.fromLTRB(9, 9, 9, 0),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(9),
-              child: AspectRatio(
-                  aspectRatio: 16 / 9, child: haberGorseli(haber['gorsel'])),
-            ),
+            child: AspectRatio(aspectRatio: 16 / 9, child: gorsel),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 11, 12, 13),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _kunye(),
-                const SizedBox(height: 7),
-                Text((haber['baslik'] ?? '').toString(),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w700,
-                        height: 1.33)),
-                const SizedBox(height: 8),
-                _tarih(),
-              ],
-            ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 11, 12, 13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _kunye(),
+              const SizedBox(height: 7),
+              Text((haber['baslik'] ?? '').toString(),
+                  maxLines: kayan ? 2 : 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w700,
+                      height: 1.33)),
+              const SizedBox(height: 8),
+              _tarih(),
+            ],
           ),
-        ],
-      );
+        ),
+      ],
+    );
+  }
 
   Widget _satir() => Padding(
         padding: const EdgeInsets.all(9),

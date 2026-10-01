@@ -16,7 +16,12 @@ class _NewsScreenState extends State<NewsScreen> {
   bool _yukleniyor = true;
   String _arama = '';
   String _bolum = 'Tümü';
+  int _sliderSira = 0;
   final _aramaDenetleyici = TextEditingController();
+  final _slider = PageController(viewportFraction: .93);
+
+  /// Slider'da gösterilen manşet sayısı; kalanlar öne çıkanlar listesine iner
+  static const _manset = 20;
 
   @override
   void initState() {
@@ -27,7 +32,14 @@ class _NewsScreenState extends State<NewsScreen> {
   @override
   void dispose() {
     _aramaDenetleyici.dispose();
+    _slider.dispose();
     super.dispose();
+  }
+
+  /// Süzgeç değişince liste kısalabilir; slider baştan başlamalı
+  void _slideriSifirla() {
+    _sliderSira = 0;
+    if (_slider.hasClients) _slider.jumpToPage(0);
   }
 
   Future<void> _yukle({bool yenile = false}) async {
@@ -86,7 +98,10 @@ class _NewsScreenState extends State<NewsScreen> {
                   const SizedBox(height: 13),
                   TextField(
                     controller: _aramaDenetleyici,
-                    onChanged: (v) => setState(() => _arama = v),
+                    onChanged: (v) => setState(() {
+                      _arama = v;
+                      _slideriSifirla();
+                    }),
                     style: const TextStyle(fontSize: 14),
                     decoration: InputDecoration(
                       hintText: 'Haberlerde ara...',
@@ -101,7 +116,10 @@ class _NewsScreenState extends State<NewsScreen> {
                                   color: MT.soluk, size: 19),
                               onPressed: () {
                                 _aramaDenetleyici.clear();
-                                setState(() => _arama = '');
+                                setState(() {
+                                  _arama = '';
+                                  _slideriSifirla();
+                                });
                               }),
                       isDense: true,
                     ),
@@ -124,15 +142,127 @@ class _NewsScreenState extends State<NewsScreen> {
                           child: Text('Aramayla eşleşen haber yok',
                               style: TextStyle(color: MT.soluk))),
                     ),
-                  for (final h in liste) ...[
-                    HaberKarti(haber: h),
-                    const SizedBox(height: 11),
+                  if (liste.isNotEmpty) _mansetSlider(liste),
+                  if (liste.length > _manset) ...[
+                    const SizedBox(height: 20),
+                    _oneCikanlar(liste.skip(_manset).toList()),
                   ],
                 ],
               ),
             ),
     );
   }
+
+  /// Manşet slider'ı: en yeni 20 haber, elle kaydırılır (ok yok — okumayı
+  /// kapatıyordu), altında nokta göstergesi ve sayaç.
+  Widget _mansetSlider(List<Map<String, dynamic>> liste) {
+    final mansetler = liste.take(_manset).toList();
+    final sira = _sliderSira.clamp(0, mansetler.length - 1);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SizedBox(
+        height: 292,
+        child: PageView.builder(
+          controller: _slider,
+          itemCount: mansetler.length,
+          onPageChanged: (i) => setState(() => _sliderSira = i),
+          itemBuilder: (_, i) => Padding(
+            padding: const EdgeInsets.only(right: 9),
+            child: HaberKarti(haber: mansetler[i], kayan: true),
+          ),
+        ),
+      ),
+      const SizedBox(height: 11),
+      Row(children: [
+        // Çok haberde nokta sığmaz; kayan pencerede en fazla 7 nokta
+        ..._noktalar(sira, mansetler.length),
+        const Spacer(),
+        Text('${sira + 1} / ${mansetler.length}',
+            style: MT.fiyat(
+                size: 11, weight: FontWeight.w700, color: MT.soluk)),
+      ]),
+    ]);
+  }
+
+  List<Widget> _noktalar(int sira, int toplam) {
+    const gorunen = 7;
+    var bas = 0;
+    if (toplam > gorunen) {
+      bas = (sira - gorunen ~/ 2).clamp(0, toplam - gorunen);
+    }
+    final son = (bas + gorunen).clamp(0, toplam);
+    return [
+      for (var i = bas; i < son; i++)
+        Container(
+          width: i == sira ? 17 : 6,
+          height: 6,
+          margin: const EdgeInsets.only(right: 5),
+          decoration: BoxDecoration(
+            color: i == sira ? MT.altin : MT.cizgi,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+    ];
+  }
+
+  /// Slider'a girmeyen haberler — sitedeki numaralı "Öne Çıkanlar" listesi
+  Widget _oneCikanlar(List<Map<String, dynamic>> liste) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.star_rounded, size: 18, color: MT.altin),
+          const SizedBox(width: 6),
+          const Text('Öne Çıkanlar',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const Spacer(),
+          Text('${liste.length} haber',
+              style: const TextStyle(fontSize: 11.5, color: MT.soluk)),
+        ]),
+        const SizedBox(height: 10),
+        Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: Column(children: [
+            for (var i = 0; i < liste.length; i++) ...[
+              if (i > 0) const Divider(height: 1, color: MT.cizgi),
+              _oneCikanSatir(i + 1, liste[i]),
+            ],
+          ]),
+        ),
+      ]);
+
+  Widget _oneCikanSatir(int sira, Map<String, dynamic> h) => InkWell(
+        onTap: () => habereGit(context, h),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(
+              width: 22,
+              child: Text('$sira',
+                  style: MT.fiyat(
+                      size: 15, weight: FontWeight.w800, color: MT.kirmizi)),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text((h['baslik'] ?? '').toString(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          height: 1.33)),
+                  const SizedBox(height: 5),
+                  Text(
+                      '${h['kaynak'] ?? 'MTEX'} · '
+                      '${haberZamani(h['tarih'])}',
+                      style:
+                          const TextStyle(fontSize: 11, color: MT.soluk)),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      );
 
   Widget _cip(String ad) {
     final secili = _bolum == ad;
@@ -141,7 +271,10 @@ class _NewsScreenState extends State<NewsScreen> {
         : _haberler.where((h) => _haberBolum(h) == ad).length;
     return InkWell(
       borderRadius: BorderRadius.circular(20),
-      onTap: () => setState(() => _bolum = ad),
+      onTap: () => setState(() {
+        _bolum = ad;
+        _slideriSifirla();
+      }),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
